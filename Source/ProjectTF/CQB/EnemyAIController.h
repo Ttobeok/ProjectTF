@@ -281,6 +281,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Compliance")
 	float ComplianceThreshold = 1.0f;
 
+	/** Pressure from a demand shouted right in their face, falling off to nothing at ComplianceRange */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Compliance")
+	float ComplianceProximityWeight = 0.5f;
+
+	/** Pressure from having nobody else left standing on your side */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Compliance")
+	float ComplianceIsolationWeight = 0.4f;
+
+	/** Pressure lost when the AI cannot actually see who is shouting */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Compliance")
+	float ComplianceBlindPenalty = 0.3f;
+
 	/** Draw the state name over the pawn */
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Debug")
 	bool bDrawStateDebug = true;

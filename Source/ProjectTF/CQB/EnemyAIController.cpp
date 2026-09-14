@@ -932,7 +932,7 @@ float AEnemyAIController::EvaluateCompliance(const AActor* Challenger) const
 	const float Distance = FVector::Dist(MyPawn->GetActorLocation(), Challenger->GetActorLocation());
 	if (Distance < ComplianceRange)
 	{
-		Pressure += 0.5f * (1.0f - Distance / ComplianceRange);
+		Pressure += ComplianceProximityWeight * (1.0f - Distance / ComplianceRange);
 	}
 
 	// being alone is worse than having the squad around
@@ -949,13 +949,13 @@ float AEnemyAIController::EvaluateCompliance(const AActor* Challenger) const
 
 	if (StandingMates == 0)
 	{
-		Pressure += 0.4f;
+		Pressure += ComplianceIsolationWeight;
 	}
 
 	// caught out of cover with a weapon pointed at you
 	if (!bHasLineOfSight)
 	{
-		Pressure -= 0.3f;
+		Pressure -= ComplianceBlindPenalty;
 	}
 
 	return FMath::Max(0.0f, Pressure);
