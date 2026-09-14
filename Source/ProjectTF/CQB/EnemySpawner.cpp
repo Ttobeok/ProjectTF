@@ -115,31 +115,11 @@ void AEnemySpawner::ReportNavigationState()
 	}
 
 	FNavLocation Projected;
-	const bool bHere = NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(400.0f, 400.0f, 500.0f));
-
-	int32 BoundsCount = NavSys->GetNavigationBounds().Num();
-
-	UE_LOG(LogProjectTF, Warning, TEXT("CQB nav [%s]: navdata=%d bounds=%d projectHere=%d"),
-		*GetName(), NavSys->NavDataSet.Num(), BoundsCount, bHere ? 1 : 0);
-
-	// where is everyone, and can the first spawned pawn actually see the player
-	if (const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
+	if (!NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(400.0f, 400.0f, 500.0f)))
 	{
-		FString Line = FString::Printf(TEXT("CQB where: player=%s"), *PlayerPawn->GetActorLocation().ToCompactString());
-
-		for (const TObjectPtr<AEnemyCharacter>& Spawned : SpawnedEnemies)
-		{
-			if (!IsValid(Spawned))
-			{
-				continue;
-			}
-
-			const bool bLoS = Spawned->GetController() && Spawned->GetController()->LineOfSightTo(PlayerPawn);
-			Line += FString::Printf(TEXT("  %s=%s los=%d"), *Spawned->GetName(),
-				*Spawned->GetActorLocation().ToCompactString(), bLoS ? 1 : 0);
-		}
-
-		UE_LOG(LogProjectTF, Warning, TEXT("%s"), *Line);
+		// worth shouting about: without this the AI cannot move anywhere at all
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB nav [%s]: still no navmesh here. navdata=%d bounds=%d"),
+			*GetName(), NavSys->NavDataSet.Num(), NavSys->GetNavigationBounds().Num());
 	}
 }
 

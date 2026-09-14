@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "ProjectTFCharacter.h"
+#include "CQB/CQBSightTarget.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -505,4 +506,17 @@ void AProjectTFCharacter::RunScriptedOrder()
 	{
 		CommandFollow();
 	}
+}
+
+UAISense_Sight::EVisibilityResult AProjectTFCharacter::CanBeSeenFrom(const FCanBeSeenFromContext& Context,
+	FVector& OutSeenLocation, int32& OutNumberOfLoSChecksPerformed, int32& OutNumberOfAsyncLosCheckRequested,
+	float& OutSightStrength, int32* UserData, const FOnPendingVisibilityQueryProcessedDelegate* Delegate)
+{
+	OutNumberOfLoSChecksPerformed = 0;
+	OutNumberOfAsyncLosCheckRequested = 0;
+
+	const bool bSeen = CQBSightTarget::CanBeSeenFrom(*this, Context.ObserverLocation, Context.IgnoreActor,
+		OutSeenLocation, OutNumberOfLoSChecksPerformed, OutSightStrength);
+
+	return bSeen ? UAISense_Sight::EVisibilityResult::Visible : UAISense_Sight::EVisibilityResult::NotVisible;
 }

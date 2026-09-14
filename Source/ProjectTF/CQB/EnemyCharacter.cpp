@@ -1,6 +1,7 @@
 // CQB Sample - AI enemy pawn.
 
 #include "EnemyCharacter.h"
+#include "CQBSightTarget.h"
 #include "HealthComponent.h"
 #include "WeaponComponent.h"
 #include "WeaponData.h"
@@ -152,4 +153,17 @@ void AEnemyCharacter::OnEnemyDeath(AActor* DeadActor, AActor* Killer)
 void AEnemyCharacter::DeferredDestroy()
 {
 	Destroy();
+}
+
+UAISense_Sight::EVisibilityResult AEnemyCharacter::CanBeSeenFrom(const FCanBeSeenFromContext& Context,
+	FVector& OutSeenLocation, int32& OutNumberOfLoSChecksPerformed, int32& OutNumberOfAsyncLosCheckRequested,
+	float& OutSightStrength, int32* UserData, const FOnPendingVisibilityQueryProcessedDelegate* Delegate)
+{
+	OutNumberOfLoSChecksPerformed = 0;
+	OutNumberOfAsyncLosCheckRequested = 0;
+
+	const bool bSeen = CQBSightTarget::CanBeSeenFrom(*this, Context.ObserverLocation, Context.IgnoreActor,
+		OutSeenLocation, OutNumberOfLoSChecksPerformed, OutSightStrength);
+
+	return bSeen ? UAISense_Sight::EVisibilityResult::Visible : UAISense_Sight::EVisibilityResult::NotVisible;
 }

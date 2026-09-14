@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "CQBTypes.h"
+#include "Perception/AISightTargetInterface.h"
 #include "EnemyCharacter.generated.h"
 
 class UHealthComponent;
@@ -19,7 +20,7 @@ class UNavigationInvokerComponent;
  *  Ragdolls on death and is destroyed a few seconds later.
  */
 UCLASS()
-class PROJECTTF_API AEnemyCharacter : public ACharacter, public ICQBFactionAgent
+class PROJECTTF_API AEnemyCharacter : public ACharacter, public ICQBFactionAgent, public IAISightTargetInterface
 {
 	GENERATED_BODY()
 
@@ -55,6 +56,13 @@ public:
 	//~Begin ICQBFactionAgent
 	virtual ECQBFaction GetFaction() const override { return Faction; }
 	//~End ICQBFactionAgent
+
+	//~Begin IAISightTargetInterface
+	virtual UAISense_Sight::EVisibilityResult CanBeSeenFrom(const FCanBeSeenFromContext& Context,
+		FVector& OutSeenLocation, int32& OutNumberOfLoSChecksPerformed, int32& OutNumberOfAsyncLosCheckRequested,
+		float& OutSightStrength, int32* UserData = nullptr,
+		const FOnPendingVisibilityQueryProcessedDelegate* Delegate = nullptr) override;
+	//~End IAISightTargetInterface
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	UWeaponVisualComponent* GetWeaponVisual() const { return WeaponVisual; }

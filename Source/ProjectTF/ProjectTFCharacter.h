@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
 #include "CQB/CQBTypes.h"
+#include "Perception/AISightTargetInterface.h"
 #include "ProjectTFCharacter.generated.h"
 
 class UInputComponent;
@@ -27,7 +28,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
  *  Carries the CQB health and hitscan weapon components and handles fire / ADS / reload / lean input.
  */
 UCLASS(abstract)
-class AProjectTFCharacter : public ACharacter, public ICQBFactionAgent
+class AProjectTFCharacter : public ACharacter, public ICQBFactionAgent, public IAISightTargetInterface
 {
 	GENERATED_BODY()
 
@@ -127,6 +128,13 @@ public:
 	//~Begin ICQBFactionAgent
 	virtual ECQBFaction GetFaction() const override { return ECQBFaction::Player; }
 	//~End ICQBFactionAgent
+
+	//~Begin IAISightTargetInterface
+	virtual UAISense_Sight::EVisibilityResult CanBeSeenFrom(const FCanBeSeenFromContext& Context,
+		FVector& OutSeenLocation, int32& OutNumberOfLoSChecksPerformed, int32& OutNumberOfAsyncLosCheckRequested,
+		float& OutSightStrength, int32* UserData = nullptr,
+		const FOnPendingVisibilityQueryProcessedDelegate* Delegate = nullptr) override;
+	//~End IAISightTargetInterface
 
 	/** Doorway the player is currently aiming at, or null. Read by the HUD for the order hint. */
 	UFUNCTION(BlueprintPure, Category="Squad")
