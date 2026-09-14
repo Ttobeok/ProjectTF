@@ -45,6 +45,11 @@ protected:
 	/** Rebuilds the navmesh at startup when the level carries an empty one */
 	void EnsureNavigationBuilt();
 
+	/** Debug helper driven by the cqb.KillEnemyAfter console variable */
+	void DebugKillOneEnemy();
+
+	FTimerHandle DebugKillTimerHandle;
+
 	/** Editor only arrow so the spawner can be found in the viewport */
 	UPROPERTY(VisibleAnywhere, Category = "Spawner")
 	UArrowComponent* ArrowComponent;

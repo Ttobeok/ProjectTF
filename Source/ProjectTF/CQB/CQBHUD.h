@@ -24,7 +24,26 @@ public:
 
 	virtual void DrawHUD() override;
 
+	//~ Debug console commands, handy for driving the AI without a controller in your hands
+
+	/** Kills one living enemy after a delay, to watch Man down and the role reassignment */
+	UFUNCTION(Exec)
+	void CQBKillEnemy(float DelaySeconds = 0.0f);
+
+	/** Teleports the player after a delay, to break line of sight and watch Lost visual */
+	UFUNCTION(Exec)
+	void CQBMovePlayer(float X, float Y, float DelaySeconds = 0.0f);
+
 protected:
+
+	/** Timer bodies for the console commands above */
+	void KillOneEnemy();
+	void TeleportPlayer();
+
+	FTimerHandle KillTimerHandle;
+	FTimerHandle TeleportTimerHandle;
+	FVector PendingTeleport = FVector::ZeroVector;
+
 
 	/** Four ticks around a centre dot. The gap grows with spread. */
 	void DrawCrosshair(const UWeaponComponent* Weapon);

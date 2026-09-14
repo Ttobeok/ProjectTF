@@ -12,6 +12,9 @@
 #include "Engine/Polys.h"
 #include "GameFramework/WorldSettings.h"
 #include "ProjectTF.h"
+#include "HealthComponent.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 AEnemySpawner::AEnemySpawner()
 {
@@ -39,6 +42,34 @@ void AEnemySpawner::BeginPlay()
 	if (bSpawnOnBeginPlay)
 	{
 		SpawnEnemies();
+	}
+
+	// Debug hook for watching the Man down callout and the role reassignment without a
+	// controller in hand:  ProjectTF.exe -CQBKillEnemyAfter=12
+	float KillAfter = 0.0f;
+	FParse::Value(FCommandLine::Get(), TEXT("CQBKillEnemyAfter="), KillAfter);
+	if (KillAfter > 0.0f)
+	{
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing one enemy in %.1fs"), KillAfter);
+		GetWorld()->GetTimerManager().SetTimer(DebugKillTimerHandle, this, &AEnemySpawner::DebugKillOneEnemy, KillAfter, false);
+	}
+}
+
+void AEnemySpawner::DebugKillOneEnemy()
+{
+	for (const TObjectPtr<AEnemyCharacter>& Enemy : SpawnedEnemies)
+	{
+		if (!IsValid(Enemy) || Enemy->IsDead())
+		{
+			continue;
+		}
+
+		if (UHealthComponent* Health = Enemy->GetHealthComponent())
+		{
+			UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing %s"), *Enemy->GetName());
+			Health->TakeDamage(Health->MaxHealth * 10.0f, this, nullptr);
+			return;
+		}
 	}
 }
 
