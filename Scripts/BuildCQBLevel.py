@@ -75,19 +75,23 @@ def solid_spans(span_min, span_max, holes):
     return spans
 
 
-def build_region(prefix, min_x, max_x, min_y, max_y, walls, floor=True):
+def build_region(prefix, min_x, max_x, min_y, max_y, walls, floor=True, floor_drop=0.0):
     """
     Floor slab plus the requested walls for one rectangular region.
 
     walls maps a side to the list of openings on it:
       "N" and "S" take openings as X ranges, "W" and "E" as Y ranges.
     A side left out of the dict gets no wall at all, which is how regions join up.
+
+    Floor slabs run under the walls, so neighbouring regions overlap by the wall thickness.
+    floor_drop sinks a slab by a couple of centimetres to keep those overlaps from z fighting;
+    the resulting step is far below the character step height and cannot be felt.
     """
     t = WALL_THICKNESS
 
     if floor:
         spawn_box(prefix + "_Floor",
-                  (min_x + max_x) * 0.5, (min_y + max_y) * 0.5, -FLOOR_THICKNESS * 0.5,
+                  (min_x + max_x) * 0.5, (min_y + max_y) * 0.5, -FLOOR_THICKNESS * 0.5 - floor_drop,
                   (max_x - min_x) + t * 2, (max_y - min_y) + t * 2, FLOOR_THICKNESS)
 
     for side, holes in walls.items():
@@ -120,7 +124,7 @@ def build_geometry():
 
     # approach corridor. Open at both ends, so only the side walls are built.
     build_region("Entry", -1000.0, -800.0, -350.0, -150.0,
-                 {"N": [], "S": []})
+                 {"N": [], "S": []}, floor_drop=2.0)
 
     # room A, where the player pie slices the corner before pushing the door
     build_region("RoomA", -800.0, 0.0, -400.0, 400.0,
@@ -131,7 +135,7 @@ def build_geometry():
 
     # the door itself: a 2 m hole in the wall, 2 m deep. The choke point.
     build_region("Door", 0.0, 200.0, 150.0, 350.0,
-                 {"N": [], "S": []})
+                 {"N": [], "S": []}, floor_drop=2.0)
 
     # room B, held by the enemies
     build_region("RoomB", 200.0, 1000.0, -400.0, 400.0,
@@ -141,13 +145,13 @@ def build_geometry():
                   "W": [(150.0, 350.0)]})
 
     # flank loop: room B -> south -> west -> north -> room A
-    build_region("FlankStubB", 700.0, 900.0, -500.0, -400.0, {"W": [], "E": []}, floor=True)
-    build_region("FlankStubA", -700.0, -500.0, -500.0, -400.0, {"W": [], "E": []}, floor=True)
+    build_region("FlankStubB", 700.0, 900.0, -500.0, -400.0, {"W": [], "E": []}, floor_drop=2.0)
+    build_region("FlankStubA", -700.0, -500.0, -500.0, -400.0, {"W": [], "E": []}, floor_drop=2.0)
     build_region("FlankMain", -700.0, 900.0, -700.0, -500.0,
                  {"S": [],
                   "N": [(-700.0, -500.0), (700.0, 900.0)],   # the two stubs
                   "W": [],
-                  "E": []})
+                  "E": []}, floor_drop=4.0)
 
 
 def build_cover():
