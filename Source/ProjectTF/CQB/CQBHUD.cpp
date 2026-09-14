@@ -11,8 +11,6 @@
 #include "DoorwayMarker.h"
 #include "AllyAIController.h"
 #include "ProjectTFCharacter.h"
-#include "EngineUtils.h"
-#include "TimerManager.h"
 #include "ProjectTF.h"
 
 ACQBHUD::ACQBHUD()
@@ -232,74 +230,3 @@ void ACQBHUD::DrawSquadBar()
 }
 
 //~ Debug console commands ----------------------------------------------------
-
-void ACQBHUD::CQBKillEnemy(float DelaySeconds)
-{
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	if (DelaySeconds > 0.0f)
-	{
-		World->GetTimerManager().SetTimer(KillTimerHandle, this, &ACQBHUD::KillOneEnemy, DelaySeconds, false);
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing an enemy in %.1fs"), DelaySeconds);
-		return;
-	}
-
-	KillOneEnemy();
-}
-
-void ACQBHUD::KillOneEnemy()
-{
-	for (TActorIterator<ACQBCharacter> It(GetWorld()); It; ++It)
-	{
-		ACQBCharacter* Enemy = *It;
-		if (!Enemy || Enemy->IsDead())
-		{
-			continue;
-		}
-
-		UHealthComponent* Health = Enemy->GetHealthComponent();
-		if (!Health)
-		{
-			continue;
-		}
-
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing %s"), *Enemy->GetName());
-		Health->TakeDamage(Health->MaxHealth * 10.0f, GetOwningPawn(), GetOwningPlayerController());
-		return;
-	}
-
-	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: no living enemy to kill"));
-}
-
-void ACQBHUD::CQBMovePlayer(float X, float Y, float DelaySeconds)
-{
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	PendingTeleport = FVector(X, Y, 150.0f);
-
-	if (DelaySeconds > 0.0f)
-	{
-		World->GetTimerManager().SetTimer(TeleportTimerHandle, this, &ACQBHUD::TeleportPlayer, DelaySeconds, false);
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: teleporting the player in %.1fs"), DelaySeconds);
-		return;
-	}
-
-	TeleportPlayer();
-}
-
-void ACQBHUD::TeleportPlayer()
-{
-	if (APawn* MyPawn = GetOwningPawn())
-	{
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: teleporting the player to %s"), *PendingTeleport.ToCompactString());
-		MyPawn->TeleportTo(PendingTeleport, MyPawn->GetActorRotation());
-	}
-}

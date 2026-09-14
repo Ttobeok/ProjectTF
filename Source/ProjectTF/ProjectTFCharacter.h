@@ -154,6 +154,14 @@ public:
 	UFUNCTION(BlueprintPure, Category="Squad")
 	AActor* GetChallengeTarget() const { return ChallengeTarget; }
 
+	/** Issues a named order to the selected element. Used by the input bindings and by tests. */
+	UFUNCTION(BlueprintCallable, Category="Squad")
+	void IssueSquadOrder(const FString& OrderName, ADoorwayMarker* Doorway);
+
+	/** Shouts at a specific suspect, whatever the crosshair is on */
+	UFUNCTION(BlueprintCallable, Category="Squad")
+	void IssueChallenge(AActor* Suspect);
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -230,14 +238,7 @@ protected:
 	/** Point under the crosshair, for move and watch orders. Returns false when nothing is hit. */
 	bool GetAimedPoint(FVector& OutPoint) const;
 
-	/**
-	 *  Issues an order from the command line, so the squad can be driven without a keyboard:
-	 *    ProjectTF.exe -CQBOrder=stack -CQBOrderAfter=6 -CQBOrderDoor=1
-	 *  Orders are follow, hold, stack and clear; the door index picks which marker.
-	 */
-	void RunScriptedOrder();
 
-	FTimerHandle ScriptedOrderTimer;
 
 	/** How far the player can be from a doorway and still give orders about it */
 	UPROPERTY(EditDefaultsOnly, Category="Squad")

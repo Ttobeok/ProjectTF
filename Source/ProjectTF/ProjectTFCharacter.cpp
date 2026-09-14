@@ -17,7 +17,7 @@
 #include "CQB/DoorwayMarker.h"
 #include "CQB/AllyAIController.h"
 #include "CQB/EnemyAIController.h"
-#include "CQB/EnemyCharacter.h"
+#include "CQB/CQBCharacter.h"
 #include "Perception/AISense_Hearing.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
@@ -86,13 +86,6 @@ void AProjectTFCharacter::BeginPlay()
 	{
 		HealthComponent->OnHealthChanged.AddDynamic(this, &AProjectTFCharacter::OnHealthChanged);
 		HealthComponent->OnDeath.AddDynamic(this, &AProjectTFCharacter::OnPlayerDeath);
-	}
-
-	// debug hook: drive the squad from the command line for headless checks
-	float OrderAfter = 0.0f;
-	if (FParse::Value(FCommandLine::Get(), TEXT("CQBOrderAfter="), OrderAfter) && OrderAfter > 0.0f)
-	{
-		GetWorld()->GetTimerManager().SetTimer(ScriptedOrderTimer, this, &AProjectTFCharacter::RunScriptedOrder, OrderAfter, false);
 	}
 
 	// The arms are not animated to hold anything, so they would be empty handed next to a
@@ -498,7 +491,13 @@ void AProjectTFCharacter::UpdateChallengeTarget()
 
 void AProjectTFCharacter::CommandChallenge()
 {
-	if (!ChallengeTarget)
+	IssueChallenge(ChallengeTarget);
+}
+
+void AProjectTFCharacter::IssueChallenge(AActor* Suspect)
+{
+	APawn* SuspectPawn = Cast<APawn>(Suspect);
+	if (!SuspectPawn)
 	{
 		return;
 	}
@@ -512,10 +511,52 @@ void AProjectTFCharacter::CommandChallenge()
 	// a shout is a noise like any other; anyone nearby hears it
 	UAISense_Hearing::ReportNoiseEvent(GetWorld(), GetActorLocation(), 1.5f, this, ChallengeRange, TEXT("Shout"));
 
-	if (AEnemyAIController* Brain = Cast<AEnemyAIController>(Cast<APawn>(ChallengeTarget)->GetController()))
+	if (AEnemyAIController* Brain = Cast<AEnemyAIController>(SuspectPawn->GetController()))
 	{
 		// aiming straight at them is what makes a demand credible
 		Brain->ReceiveChallenge(this, 0.35f);
+	}
+}
+
+void AProjectTFCharacter::IssueSquadOrder(const FString& OrderName, ADoorwayMarker* Doorway)
+{
+	TArray<AAllyAIController*> Selected = GetSelectedSquad();
+
+	if (OrderName == TEXT("hold"))
+	{
+		for (AAllyAIController* Member : Selected)
+		{
+			Member->OrderHold();
+		}
+	}
+	else if (OrderName == TEXT("watch"))
+	{
+		const FVector Point = Doorway ? Doorway->GetClearPoint() : GetActorLocation();
+		for (AAllyAIController* Member : Selected)
+		{
+			Member->OrderWatch(Point);
+		}
+	}
+	else if (OrderName == TEXT("stack") && Doorway)
+	{
+		for (int32 Index = 0; Index < Selected.Num(); ++Index)
+		{
+			Selected[Index]->OrderStack(Doorway, (Index % 2 == 0) ? EStackSide::Left : EStackSide::Right);
+		}
+	}
+	else if (OrderName == TEXT("clear") && Doorway)
+	{
+		for (AAllyAIController* Member : Selected)
+		{
+			Member->OrderClear(Doorway);
+		}
+	}
+	else
+	{
+		for (AAllyAIController* Member : Selected)
+		{
+			Member->OrderFollow();
+		}
 	}
 }
 
@@ -535,128 +576,22 @@ void AProjectTFCharacter::CommandWatch()
 
 void AProjectTFCharacter::CommandFollow()
 {
-	for (AAllyAIController* Member : GetSelectedSquad())
-	{
-		Member->OrderFollow();
-	}
+	IssueSquadOrder(TEXT("follow"), nullptr);
 }
 
 void AProjectTFCharacter::CommandHold()
 {
-	for (AAllyAIController* Member : GetSelectedSquad())
-	{
-		Member->OrderHold();
-	}
+	IssueSquadOrder(TEXT("hold"), nullptr);
 }
 
 void AProjectTFCharacter::CommandStackOrOne()
 {
-	if (!AimedDoorway)
-	{
-		return;
-	}
-
-	// the squad splits across the doorway, one side each
-	TArray<AAllyAIController*> Squad = GetSelectedSquad();
-
-	for (int32 Index = 0; Index < Squad.Num(); ++Index)
-	{
-		const EStackSide Side = (Index % 2 == 0) ? EStackSide::Left : EStackSide::Right;
-		Squad[Index]->OrderStack(AimedDoorway, Side);
-	}
+	IssueSquadOrder(TEXT("stack"), AimedDoorway);
 }
 
 void AProjectTFCharacter::CommandClearOrTwo()
 {
-	if (!AimedDoorway)
-	{
-		return;
-	}
-
-	for (AAllyAIController* Member : GetSelectedSquad())
-	{
-		Member->OrderClear(AimedDoorway);
-	}
-}
-
-void AProjectTFCharacter::RunScriptedOrder()
-{
-	FString Order;
-	FParse::Value(FCommandLine::Get(), TEXT("CQBOrder="), Order);
-
-	int32 DoorIndex = 0;
-	FParse::Value(FCommandLine::Get(), TEXT("CQBOrderDoor="), DoorIndex);
-
-	// pick the doorway by index, in the order the level lists them
-	TArray<ADoorwayMarker*> Doorways;
-	for (TActorIterator<ADoorwayMarker> It(GetWorld()); It; ++It)
-	{
-		Doorways.Add(*It);
-	}
-	Doorways.Sort([](const ADoorwayMarker& A, const ADoorwayMarker& B)
-	{
-		return A.GetActorLocation().X < B.GetActorLocation().X;
-	});
-
-	AimedDoorway = Doorways.IsValidIndex(DoorIndex) ? Doorways[DoorIndex] : nullptr;
-
-	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: scripted order '%s' on %s"),
-		*Order, AimedDoorway ? *AimedDoorway->GetDisplayName() : TEXT("no doorway"));
-
-	if (Order == TEXT("hold"))
-	{
-		CommandHold();
-	}
-	else if (Order == TEXT("watch"))
-	{
-		// aim at the far wall of the room beyond and have the squad keep eyes on it
-		for (AAllyAIController* Member : GetSelectedSquad())
-		{
-			Member->OrderWatch(AimedDoorway ? AimedDoorway->GetClearPoint() : GetActorLocation());
-		}
-	}
-	else if (Order == TEXT("challenge"))
-	{
-		// shout at the nearest standing suspect, wherever the crosshair happens to be
-		ACQBCharacter* Nearest = nullptr;
-		float NearestDistance = TNumericLimits<float>::Max();
-
-		for (TActorIterator<ACQBCharacter> It(GetWorld()); It; ++It)
-		{
-			ACQBCharacter* Suspect = *It;
-			if (!Suspect || Suspect->IsDead() || Suspect->IsSurrendered()
-				|| !FCQBFactions::AreHostile(this, Suspect))
-			{
-				continue;
-			}
-
-			const float Distance = FVector::Dist(GetActorLocation(), Suspect->GetActorLocation());
-			if (Distance < NearestDistance)
-			{
-				NearestDistance = Distance;
-				Nearest = Suspect;
-			}
-		}
-
-		if (Nearest)
-		{
-			UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: challenging %s at %.0f"), *Nearest->GetName(), NearestDistance);
-			ChallengeTarget = Nearest;
-			CommandChallenge();
-		}
-	}
-	else if (Order == TEXT("stack"))
-	{
-		CommandStackOrOne();
-	}
-	else if (Order == TEXT("clear"))
-	{
-		CommandClearOrTwo();
-	}
-	else
-	{
-		CommandFollow();
-	}
+	IssueSquadOrder(TEXT("clear"), AimedDoorway);
 }
 
 UAISense_Sight::EVisibilityResult AProjectTFCharacter::CanBeSeenFrom(const FCanBeSeenFromContext& Context,

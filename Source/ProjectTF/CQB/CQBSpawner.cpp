@@ -10,10 +10,8 @@
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
-#include "Misc/CommandLine.h"
-#include "Misc/Parse.h"
-#include "UnrealClient.h"
 #include "Kismet/GameplayStatics.h"
+#include "CQBDebugDirector.h"
 #include "ProjectTF.h"
 
 ACQBSpawner::ACQBSpawner()
@@ -44,33 +42,8 @@ void ACQBSpawner::BeginPlay()
 		SpawnCharacters();
 	}
 
-	// Debug hook for watching the Man down callout and the role reassignment without a
-	// controller in hand:  ProjectTF.exe -CQBKillEnemyAfter=12
-	float KillAfter = 0.0f;
-	FParse::Value(FCommandLine::Get(), TEXT("CQBKillEnemyAfter="), KillAfter);
-
-	if (KillAfter > 0.0f)
-	{
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing one enemy in %.1fs"), KillAfter);
-		GetWorld()->GetTimerManager().SetTimer(DebugKillTimerHandle, this, &ACQBSpawner::DebugKillOneEnemy, KillAfter, false);
-	}
-
-	// Screenshot hook, for checking the crosshair and the weapons without sitting at the machine:
-	//   ProjectTF.exe -CQBScreenshotAfter=5
-	float ScreenshotAfter = 0.0f;
-	FParse::Value(FCommandLine::Get(), TEXT("CQBScreenshotAfter="), ScreenshotAfter);
-
-	if (ScreenshotAfter > 0.0f)
-	{
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: screenshot in %.1fs"), ScreenshotAfter);
-		GetWorld()->GetTimerManager().SetTimer(DebugScreenshotTimerHandle, this, &ACQBSpawner::DebugTakeScreenshot, ScreenshotAfter, false);
-	}
-}
-
-void ACQBSpawner::DebugTakeScreenshot()
-{
-	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: taking a screenshot"));
-	FScreenshotRequest::RequestScreenshot(false);
+	// all the command line driven test hooks live in one actor, not in here
+	ACQBDebugDirector::EnsureExists(this);
 }
 
 void ACQBSpawner::EnsureNavigationBuilt()
@@ -124,46 +97,6 @@ void ACQBSpawner::ReportNavigationState()
 	}
 }
 
-void ACQBSpawner::DebugKillOneEnemy()
-{
-	// -CQBKillCount=N takes out several at once, for testing how isolation affects compliance.
-	// -CQBKillDamage=<fraction of max health> wounds instead of killing, which is the other
-	// half of what makes a suspect give up.
-	int32 KillCount = 1;
-	FParse::Value(FCommandLine::Get(), TEXT("CQBKillCount="), KillCount);
-
-	float DamageFraction = 10.0f;
-	FParse::Value(FCommandLine::Get(), TEXT("CQBKillDamage="), DamageFraction);
-
-	// the ally spawner shares this class, and killing a squad member is not what the flag asks for
-	if (!SpawnedCharacters.IsEmpty() && IsValid(SpawnedCharacters[0])
-		&& SpawnedCharacters[0]->GetFaction() != ECQBFaction::Enemy)
-	{
-		return;
-	}
-
-	for (const TObjectPtr<ACQBCharacter>& Enemy : SpawnedCharacters)
-	{
-		if (!IsValid(Enemy) || Enemy->IsDead())
-		{
-			continue;
-		}
-
-		if (UHealthComponent* Health = Enemy->GetHealthComponent())
-		{
-			UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: hitting %s for %.0f%% of health"),
-				*Enemy->GetName(), DamageFraction * 100.0f);
-			Health->TakeDamage(Health->MaxHealth * DamageFraction, this, nullptr);
-
-			if (--KillCount <= 0)
-			{
-				return;
-			}
-		}
-	}
-
-	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: no living enemy to kill"));
-}
 
 void ACQBSpawner::SpawnCharacters()
 {

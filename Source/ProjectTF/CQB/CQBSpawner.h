@@ -49,12 +49,6 @@ protected:
 	/** Rebuilds the navmesh at startup when the level carries an empty one */
 	void EnsureNavigationBuilt();
 
-	/** Debug helper driven by -CQBKillEnemyAfter=<seconds> */
-	void DebugKillOneEnemy();
-
-	/** Debug helper driven by -CQBScreenshotAfter=<seconds>, used to eyeball the HUD and weapons */
-	void DebugTakeScreenshot();
-
 	/** Reports whether the navmesh turned up, a few seconds after the level loads */
 	void ReportNavigationState();
 
