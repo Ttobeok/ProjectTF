@@ -273,7 +273,7 @@ def build_gameplay_actors():
     if player_start:
         player_start.set_actor_label("PlayerStart")
 
-    spawner_class = unreal.load_class(None, "/Script/ProjectTF.EnemySpawner")
+    spawner_class = unreal.load_class(None, "/Script/ProjectTF.CQBSpawner")
     if not spawner_class:
         unreal.log_error("EnemySpawner class not found: build the editor target first")
         return
@@ -284,11 +284,15 @@ def build_gameplay_actors():
 
     spawner.set_actor_label("EnemySpawner")
 
+    enemy_class = unreal.load_class(None, "/Script/ProjectTF.EnemyCharacter")
+    if enemy_class:
+        spawner.set_editor_property("character_class", enemy_class)
+
     # one enemy next to each piece of cover in room B, relative to the spawner at (600, 0)
     # note the spawner faces -X, so the offsets are rotated with it
     # two squad members, a step behind the player
     ally_class = unreal.load_class(None, "/Script/ProjectTF.AllyCharacter")
-    ally_spawner_class = unreal.load_class(None, "/Script/ProjectTF.EnemySpawner")
+    ally_spawner_class = unreal.load_class(None, "/Script/ProjectTF.CQBSpawner")
 
     if ally_class and ally_spawner_class:
         ally_spawner = editor_actor.spawn_actor_from_class(
@@ -296,7 +300,7 @@ def build_gameplay_actors():
 
         if ally_spawner:
             ally_spawner.set_actor_label("AllySpawner")
-            ally_spawner.set_editor_property("enemy_class", ally_class)
+            ally_spawner.set_editor_property("character_class", ally_class)
             # four members, so Red and Blue are two apiece
             ally_spawner.set_editor_property("spawn_offsets", [
                 unreal.Vector(-60.0, -110.0, 0.0),

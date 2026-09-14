@@ -1,6 +1,6 @@
 // CQB Sample - drops a group of enemies into the level.
 
-#include "EnemySpawner.h"
+#include "CQBSpawner.h"
 #include "CQBCharacter.h"
 #include "EnemyCharacter.h"
 #include "HealthComponent.h"
@@ -16,7 +16,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "ProjectTF.h"
 
-AEnemySpawner::AEnemySpawner()
+ACQBSpawner::ACQBSpawner()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
@@ -25,7 +25,7 @@ AEnemySpawner::AEnemySpawner()
 	ArrowComponent->ArrowColor = FColor::Red;
 	ArrowComponent->ArrowSize = 2.0f;
 
-	EnemyClass = AEnemyCharacter::StaticClass();
+	CharacterClass = AEnemyCharacter::StaticClass();
 
 	// three enemies holding a room, spread out a little
 	SpawnOffsets.Add(FVector(0.0f, 0.0f, 0.0f));
@@ -33,7 +33,7 @@ AEnemySpawner::AEnemySpawner()
 	SpawnOffsets.Add(FVector(-250.0f, -300.0f, 0.0f));
 }
 
-void AEnemySpawner::BeginPlay()
+void ACQBSpawner::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -41,7 +41,7 @@ void AEnemySpawner::BeginPlay()
 
 	if (bSpawnOnBeginPlay)
 	{
-		SpawnEnemies();
+		SpawnCharacters();
 	}
 
 	// Debug hook for watching the Man down callout and the role reassignment without a
@@ -52,7 +52,7 @@ void AEnemySpawner::BeginPlay()
 	if (KillAfter > 0.0f)
 	{
 		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing one enemy in %.1fs"), KillAfter);
-		GetWorld()->GetTimerManager().SetTimer(DebugKillTimerHandle, this, &AEnemySpawner::DebugKillOneEnemy, KillAfter, false);
+		GetWorld()->GetTimerManager().SetTimer(DebugKillTimerHandle, this, &ACQBSpawner::DebugKillOneEnemy, KillAfter, false);
 	}
 
 	// Screenshot hook, for checking the crosshair and the weapons without sitting at the machine:
@@ -63,17 +63,17 @@ void AEnemySpawner::BeginPlay()
 	if (ScreenshotAfter > 0.0f)
 	{
 		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: screenshot in %.1fs"), ScreenshotAfter);
-		GetWorld()->GetTimerManager().SetTimer(DebugScreenshotTimerHandle, this, &AEnemySpawner::DebugTakeScreenshot, ScreenshotAfter, false);
+		GetWorld()->GetTimerManager().SetTimer(DebugScreenshotTimerHandle, this, &ACQBSpawner::DebugTakeScreenshot, ScreenshotAfter, false);
 	}
 }
 
-void AEnemySpawner::DebugTakeScreenshot()
+void ACQBSpawner::DebugTakeScreenshot()
 {
 	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: taking a screenshot"));
 	FScreenshotRequest::RequestScreenshot(false);
 }
 
-void AEnemySpawner::EnsureNavigationBuilt()
+void ACQBSpawner::EnsureNavigationBuilt()
 {
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (!NavSys)
@@ -104,10 +104,10 @@ void AEnemySpawner::EnsureNavigationBuilt()
 		NavSys->Build();
 	}
 
-	GetWorld()->GetTimerManager().SetTimer(NavReportTimer, this, &AEnemySpawner::ReportNavigationState, 4.0f, false);
+	GetWorld()->GetTimerManager().SetTimer(NavReportTimer, this, &ACQBSpawner::ReportNavigationState, 4.0f, false);
 }
 
-void AEnemySpawner::ReportNavigationState()
+void ACQBSpawner::ReportNavigationState()
 {
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (!NavSys)
@@ -124,7 +124,7 @@ void AEnemySpawner::ReportNavigationState()
 	}
 }
 
-void AEnemySpawner::DebugKillOneEnemy()
+void ACQBSpawner::DebugKillOneEnemy()
 {
 	// -CQBKillCount=N takes out several at once, for testing how isolation affects compliance.
 	// -CQBKillDamage=<fraction of max health> wounds instead of killing, which is the other
@@ -136,13 +136,13 @@ void AEnemySpawner::DebugKillOneEnemy()
 	FParse::Value(FCommandLine::Get(), TEXT("CQBKillDamage="), DamageFraction);
 
 	// the ally spawner shares this class, and killing a squad member is not what the flag asks for
-	if (!SpawnedEnemies.IsEmpty() && IsValid(SpawnedEnemies[0])
-		&& SpawnedEnemies[0]->GetFaction() != ECQBFaction::Enemy)
+	if (!SpawnedCharacters.IsEmpty() && IsValid(SpawnedCharacters[0])
+		&& SpawnedCharacters[0]->GetFaction() != ECQBFaction::Enemy)
 	{
 		return;
 	}
 
-	for (const TObjectPtr<ACQBCharacter>& Enemy : SpawnedEnemies)
+	for (const TObjectPtr<ACQBCharacter>& Enemy : SpawnedCharacters)
 	{
 		if (!IsValid(Enemy) || Enemy->IsDead())
 		{
@@ -165,10 +165,10 @@ void AEnemySpawner::DebugKillOneEnemy()
 	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: no living enemy to kill"));
 }
 
-void AEnemySpawner::SpawnEnemies()
+void ACQBSpawner::SpawnCharacters()
 {
 	UWorld* World = GetWorld();
-	if (!World || !EnemyClass)
+	if (!World || !CharacterClass)
 	{
 		return;
 	}
@@ -198,11 +198,12 @@ void AEnemySpawner::SpawnEnemies()
 
 		const FTransform SpawnTransform(GetActorRotation(), SpawnLocation);
 
-		if (ACQBCharacter* Enemy = World->SpawnActor<ACQBCharacter>(EnemyClass, SpawnTransform, SpawnParams))
+		if (ACQBCharacter* Spawned = World->SpawnActor<ACQBCharacter>(CharacterClass, SpawnTransform, SpawnParams))
 		{
-			SpawnedEnemies.Add(Enemy);
+			SpawnedCharacters.Add(Spawned);
 		}
 	}
 
-	UE_LOG(LogProjectTF, Log, TEXT("CQB: spawned %d enemies"), SpawnedEnemies.Num());
+	const ECQBFaction Side = SpawnedCharacters.Num() > 0 ? SpawnedCharacters[0]->GetFaction() : ECQBFaction::Neutral;
+	UE_LOG(LogProjectTF, Log, TEXT("CQB: spawned %d %s"), SpawnedCharacters.Num(), *FCQBNames::FactionToString(Side));
 }

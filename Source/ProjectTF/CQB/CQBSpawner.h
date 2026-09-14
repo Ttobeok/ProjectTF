@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "EnemySpawner.generated.h"
+#include "CQBSpawner.generated.h"
 
 class ACQBCharacter;
 class UArrowComponent;
@@ -15,23 +15,27 @@ class UArrowComponent;
  *  to this actor and projected onto the NavMesh.
  */
 UCLASS()
-class PROJECTTF_API AEnemySpawner : public AActor
+class PROJECTTF_API ACQBSpawner : public AActor
 {
 	GENERATED_BODY()
 
 public:
 
-	AEnemySpawner();
+	ACQBSpawner();
 
-	/** Spawns the enemies immediately. Called from BeginPlay when bSpawnOnBeginPlay is set. */
+	/** Spawns the whole group immediately. Called from BeginPlay when bSpawnOnBeginPlay is set. */
 	UFUNCTION(BlueprintCallable, Category = "Spawner")
-	void SpawnEnemies();
+	void SpawnCharacters();
 
-	/** Class to spawn. Defaults to ACQBCharacter, so no Blueprint is required. */
+	/**
+	 *  Who to spawn. The level places two of these actors: one left on the default for the enemies
+	 *  in room B, one set to AAllyCharacter for the player's squad. Nothing about the spawner
+	 *  cares which side it is filling.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
-	TSubclassOf<ACQBCharacter> EnemyClass;
+	TSubclassOf<ACQBCharacter> CharacterClass;
 
-	/** One enemy per entry, relative to this actor */
+	/** One character per entry, relative to this actor */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	TArray<FVector> SpawnOffsets;
 
@@ -65,5 +69,5 @@ protected:
 
 	/** Enemies spawned by this actor */
 	UPROPERTY()
-	TArray<TObjectPtr<ACQBCharacter>> SpawnedEnemies;
+	TArray<TObjectPtr<ACQBCharacter>> SpawnedCharacters;
 };
