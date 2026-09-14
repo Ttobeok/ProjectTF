@@ -310,8 +310,18 @@ void AProjectTFCharacter::OnHealthChanged(UHealthComponent* HealthComp, float Ne
 {
 	if (Delta < 0.0f && GEngine)
 	{
+		// the raw actor name in a packaged build is EnemyCharacter_2147482371; say Enemy_1 instead
+		FString From = GetNameSafe(Causer);
+		if (const APawn* CauserPawn = Cast<APawn>(Causer))
+		{
+			if (const AEnemyAIController* Brain = Cast<AEnemyAIController>(CauserPawn->GetController()))
+			{
+				From = Brain->GetDisplayName();
+			}
+		}
+
 		GEngine->AddOnScreenDebugMessage(9001, 2.0f, FColor::Red,
-			FString::Printf(TEXT("TAKING FIRE from %s   HP %.0f/%.0f"), *GetNameSafe(Causer), NewHealth, HealthComp->MaxHealth));
+			FString::Printf(TEXT("TAKING FIRE from %s   HP %.0f/%.0f"), *From, NewHealth, HealthComp->MaxHealth));
 	}
 }
 
