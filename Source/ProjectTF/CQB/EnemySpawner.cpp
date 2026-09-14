@@ -2,19 +2,16 @@
 
 #include "EnemySpawner.h"
 #include "EnemyCharacter.h"
+#include "HealthComponent.h"
 #include "Components/ArrowComponent.h"
 #include "Engine/World.h"
 #include "NavigationSystem.h"
-#include "NavMesh/RecastNavMesh.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "EngineUtils.h"
-#include "Components/BrushComponent.h"
-#include "Engine/Polys.h"
-#include "GameFramework/WorldSettings.h"
-#include "ProjectTF.h"
-#include "HealthComponent.h"
+#include "TimerManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "ProjectTF.h"
 
 AEnemySpawner::AEnemySpawner()
 {
@@ -48,11 +45,43 @@ void AEnemySpawner::BeginPlay()
 	// controller in hand:  ProjectTF.exe -CQBKillEnemyAfter=12
 	float KillAfter = 0.0f;
 	FParse::Value(FCommandLine::Get(), TEXT("CQBKillEnemyAfter="), KillAfter);
+
 	if (KillAfter > 0.0f)
 	{
 		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing one enemy in %.1fs"), KillAfter);
 		GetWorld()->GetTimerManager().SetTimer(DebugKillTimerHandle, this, &AEnemySpawner::DebugKillOneEnemy, KillAfter, false);
 	}
+}
+
+void AEnemySpawner::EnsureNavigationBuilt()
+{
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (!NavSys)
+	{
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: no navigation system, the AI will not move"));
+		return;
+	}
+
+	// Tiles are generated around the navigation invokers the characters carry, which takes a
+	// moment on load. If nothing has landed under the spawner by now, nudge the system:
+	// re-announce the bounds volumes and ask for a build. Move orders issued before the tiles
+	// exist are retried by the AI controller, so this is a safety net rather than a requirement.
+	FNavLocation Projected;
+	if (NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(300.0f, 300.0f, 500.0f)))
+	{
+		return;
+	}
+
+	UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: no navmesh under the spawner yet, kicking off a build"));
+
+	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::InitialLock);
+
+	for (TActorIterator<ANavMeshBoundsVolume> It(GetWorld()); It; ++It)
+	{
+		NavSys->OnNavigationBoundsUpdated(*It);
+	}
+
+	NavSys->Build();
 }
 
 void AEnemySpawner::DebugKillOneEnemy()
@@ -71,72 +100,8 @@ void AEnemySpawner::DebugKillOneEnemy()
 			return;
 		}
 	}
-}
 
-void AEnemySpawner::EnsureNavigationBuilt()
-{
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-	if (!NavSys)
-	{
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: no navigation system, the AI will not move"));
-		return;
-	}
-
-	// A level that was opened and saved in the editor without running Build Paths carries a
-	// RecastNavMesh actor holding no tiles. The navigation system treats that as valid data and
-	// skips generation, so every AI move request fails and the enemies stand still. Detect that
-	// by projecting a point we know is on the floor, and kick off a build when it comes back empty.
-	FNavLocation Projected;
-	if (NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(300.0f, 300.0f, 500.0f)))
-	{
-		return;
-	}
-
-	UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: no navmesh under the spawner, rebuilding at runtime"));
-
-	if (const AWorldSettings* WorldSettings = GetWorld()->GetWorldSettings())
-	{
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: world settings config=%s"),
-			*GetNameSafe(WorldSettings->GetNavigationSystemConfig()));
-	}
-
-	for (TActorIterator<ANavMeshBoundsVolume> It(GetWorld()); It; ++It)
-	{
-		const UBrushComponent* BrushComp = It->GetBrushComponent();
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: volume %s brush=%s polys=%d"),
-			*It->GetName(),
-			BrushComp && BrushComp->Brush ? TEXT("yes") : TEXT("NONE"),
-			BrushComp && BrushComp->Brush && BrushComp->Brush->Polys ? BrushComp->Brush->Polys->Element.Num() : -1);
-	}
-
-	// Report what the navmesh is set to. Static generation builds no generator at all, so
-	// RebuildAll and Build() silently do nothing; the level must not ship an empty Static navmesh.
-	for (const ANavigationData* NavData : NavSys->NavDataSet)
-	{
-		if (const ARecastNavMesh* Recast = Cast<ARecastNavMesh>(NavData))
-		{
-			UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: %s RuntimeGeneration=%d"),
-				*Recast->GetName(), static_cast<int32>(Recast->GetRuntimeGenerationMode()));
-		}
-	}
-
-	// Navigation building starts out locked, and a locked system drops every build request on
-	// the floor without touching a single tile. Clear the locks before asking for the build.
-	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::InitialLock);
-	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::NoUpdateInEditor);
-	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::NoUpdateInPIE);
-	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::Custom);
-	UNavigationSystemV1::SetNavigationAutoUpdateEnabled(true, NavSys);
-
-	// The navmesh is spawned during world init, which can happen before the bounds volumes
-	// register, leaving the tile generator holding an empty set of bounds. Re-announcing the
-	// volumes refreshes it and marks the tiles dirty so the build below has something to do.
-	for (TActorIterator<ANavMeshBoundsVolume> It(GetWorld()); It; ++It)
-	{
-		NavSys->OnNavigationBoundsUpdated(*It);
-	}
-
-	NavSys->Build();
+	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: no living enemy to kill"));
 }
 
 void AEnemySpawner::SpawnEnemies()
@@ -179,6 +144,4 @@ void AEnemySpawner::SpawnEnemies()
 	}
 
 	UE_LOG(LogProjectTF, Log, TEXT("CQB: spawned %d enemies"), SpawnedEnemies.Num());
-
 }
-
