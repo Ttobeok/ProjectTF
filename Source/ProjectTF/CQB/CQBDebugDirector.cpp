@@ -210,5 +210,8 @@ void ACQBDebugDirector::RunOrder()
 void ACQBDebugDirector::RunScreenshot()
 {
 	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: taking a screenshot"));
-	FScreenshotRequest::RequestScreenshot(false);
+
+	// with UI, or the shot is useless: the HUD draws to Canvas but DrawDebugString goes to the
+	// separate DebugCanvas, and a no-UI capture silently drops the state text over each pawn
+	FScreenshotRequest::RequestScreenshot(true);
 }
