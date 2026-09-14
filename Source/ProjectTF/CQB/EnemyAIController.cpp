@@ -20,6 +20,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
+#include "ProjectTF.h"
 
 AEnemyAIController::AEnemyAIController()
 {
@@ -247,8 +248,10 @@ void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 		return;
 	}
 
-	// lost the player for too long: fall back to searching the last known position
-	if (IsInCombat())
+	// lost the player for too long: fall back to searching the last known position.
+	// Flank is exempt: breaking the sight line is the whole point of going around,
+	// and the flanking route is long enough that this rule would cancel every flank.
+	if (IsInCombat() && CurrentState != EEnemyState::Flank)
 	{
 		TimeWithoutLineOfSight += DeltaTime;
 
@@ -273,6 +276,9 @@ void AEnemyAIController::SetState(EEnemyState NewState)
 	{
 		return;
 	}
+
+	UE_LOG(LogProjectTF, Log, TEXT("CQB: %s  %s -> %s"), *DisplayName,
+		*FCQBNames::StateToString(CurrentState), *FCQBNames::StateToString(NewState));
 
 	ExitState(CurrentState);
 	CurrentState = NewState;

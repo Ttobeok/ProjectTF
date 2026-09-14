@@ -11,16 +11,68 @@ Behavior Tree / StateTree는 사용하지 않고, 직접 작성한 상태머신�
 ### 에디터에서 실행
 
 1. `ProjectTF.uproject` 실행 (UE 5.8)
-2. 레벨을 열고 **NavMesh Bounds Volume**을 배치 (적이 이동하려면 필수)
-3. 적을 배치할 방에 **`EnemySpawner`** 액터를 하나 끌어다 놓기
-   - Place Actors 패널에서 `EnemySpawner` 검색
-   - 기본값이 적 3명(스포너 기준 오프셋 3개)이라 추가 설정 불필요
-4. Play
+2. `/Game/CQB/Lvl_CQB` 열기 (프로젝트 기본 맵으로 설정되어 있어 그냥 열면 됩니다)
+3. Play
 
-블루프린트를 하나도 만들지 않아도 동작합니다.
+배치나 블루프린트 작업이 필요 없습니다.
+- 레벨에 `EnemySpawner`, `PlayerStart`, `NavMeshBoundsVolume`, 조명이 모두 들어 있음
 - `AEnemyCharacter`가 템플릿 마네킹 메시(SKM_Quinn_Simple)와 `ABP_Unarmed`를 생성자에서 직접 로드
 - `ASquadManager`는 월드에 없으면 최초 요청 시 자동 스폰
 - `UWeaponComponent`는 `WeaponData` 에셋이 비어 있으면 런타임 기본값 사용
+
+> 레벨에 네비게이션 데이터가 저장되어 있지 않아 로드 시 런타임 빌드(약 0.3초)가 일어나고
+> `SpawnMissingNavigationData` 경고가 뜹니다. 에디터에서 **Build > Build Paths** 후 레벨을 저장하면 사라집니다.
+
+### 레벨 구조
+
+**`/Game/CQB/Lvl_CQB`** — 엔진 기본 큐브(`/Engine/BasicShapes/Cube`)로 그레이박싱했고,
+`Scripts/BuildCQBLevel.py`가 전부 생성합니다. CQB 스케일(방 8m, 복도 2m, 엄폐물 110~120cm)입니다.
+
+```
+ Y
+ ↑                    ┌───────────────┐         ┌───────────────┐
+ 400                  │               ╳── 문 ──╳               │
+                      │   ROOM A      │  2m    │   ROOM B      │
+                      │   8m x 8m     │        │  [B1]①  [B2]② │
+   0                  │      [A1]     │        │               │
+       ┌────┐╳╳╳╳╳╳╳╳╳│               │        │     [B3]③     │
+-250   │스폰│  진입    │          [A2] │        │               │
+       └────┘ 복도 2m  │               │        │               │
+-400                  └───╳╳╳╳────────┘         └───────╳╳╳╳────┘
+-500                      │                             │
+                          └─────────────────────────────┘
+-700                          측면 복도 (AI 우회 경로) 2m
+
+      -1400  -1000  -800            0   200            1000      X
+```
+
+`╳` 표시가 개구부입니다. **진입 복도는 방 A의 남쪽(Y -350~-150), 방 B로 가는 문은 북쪽(Y 150~350)** 으로
+어긋나게 뚫려 있습니다. 일직선으로 뚫으면 스폰 지점에서 방 B가 보여 적이 바로 사격을 시작하고,
+이 레벨이 노리는 "모서리 돌며 확인(pie-slicing)" 구간이 사라집니다.
+
+| 요소 | 값 |
+|---|---|
+| 방 A / 방 B | 각 800 x 800 (8m x 8m), X[-800,0] / X[200,1000], Y[-400,400] |
+| 벽 높이 / 두께 | 320 (3.2m) / 40 |
+| 개구부 폭 | 200 (2m) — 진입 Y[-350,-150], 문 Y[150,350] |
+| 엄폐물 | 높이 110~120 큐브 5개 (쭈그리면 가려지고, 서면 넘겨 쏠 수 있는 높이) |
+| PlayerStart | (-1200, -250, 100), +X 방향 |
+| EnemySpawner | (600, 0, 20) — 적 3명이 방 B의 엄폐물 옆에 전개 |
+| 측면 복도 | 방 B 남쪽 출구 → Y[-700,-500] 통로 → 방 A 남서쪽 입구 |
+| NavMeshBounds | 중심 (-200, -150, 140), 범위 2800 x 1600 x 800 |
+
+**측면 복도가 이 레벨의 핵심입니다.** 우회로가 없으면 `Flank` 상태가 갈 곳이 없어서
+AI가 결국 정면으로 밀고 들어옵니다. 이 복도 덕분에 Flanker 역할을 받은 적이
+방 B 남쪽 → 서쪽 통로 → 방 A 남서쪽으로 돌아 들어와 **플레이어 뒤/옆에서** 나타납니다.
+
+### 레벨을 다시 생성하려면
+
+```bash
+UnrealEditor-Cmd.exe ProjectTF.uproject -run=pythonscript -script="Scripts/BuildCQBLevel.py"
+```
+
+에디터 안에서는 **Tools > Execute Python Script**로도 실행할 수 있습니다.
+치수는 스크립트 상단 상수와 `build_geometry()`의 좌표만 고치면 됩니다.
 
 ### 조작
 
@@ -111,13 +163,17 @@ Source/ProjectTF/
 | **Suppress** | "Suppressing!" 콜아웃, 사격 시작 | 2초 사격 / 1초 휴식 반복 | (전역 규칙으로만 이탈) |
 | **Flank** | 측면 지점으로 이동,<br>"Flanking left/right!" 콜아웃 | 도착 판정 | 도착 → `Engage` (이후 재플랭크 금지) |
 
-**전역 전이 규칙** (모든 전투 상태 `Engage / Cover / Flank / Suppress`에 적용)
+**전역 전이 규칙**
 
-| 조건 | 결과 |
-|---|---|
-| 플레이어 시야 3초 이상 상실 | "Lost visual" 콜아웃 → `Investigate` (마지막 목격 위치) |
-| 플레이어 사망 | `Idle` |
-| 시야 확보 (Idle / Investigate 중) | `Engage` |
+| 조건 | 적용 상태 | 결과 |
+|---|---|---|
+| 플레이어 시야 3초 이상 상실 | `Engage` / `Cover` / `Suppress` | "Lost visual" 콜아웃 → `Investigate` (마지막 목격 위치) |
+| 플레이어 사망 | 전체 | `Idle` |
+| 시야 확보 | `Idle` / `Investigate` | `Engage` |
+
+> **`Flank`는 시야 상실 규칙에서 제외했습니다.** 우회는 시야를 일부러 끊는 기동이고,
+> 이 레벨의 측면 복도는 편도 약 22m(6초)라 규칙을 그대로 적용하면 모든 flank가 중간에 취소됩니다.
+> 도착해서 `Engage`로 돌아온 뒤부터 다시 규칙이 적용됩니다.
 
 시야 판정은 **Perception(Sight)으로 최초 획득**(반경 2000, 시야각 70도) 후,
 매 프레임 `LineOfSightTo()`로 확인합니다. 엄폐물 뒤로 숨으면 즉시 반영됩니다.
@@ -142,7 +198,10 @@ Source/ProjectTF/
 ### 측면 지점 — `GetFlankPoint()`
 
 플레이어 → 적 방향 벡터를 플레이어 기준으로 **좌/우 90도 회전**, 거리 600에서 지점을 잡고
-`ProjectPointToNavigation()`으로 NavMesh에 투영합니다. 투영 실패 시 근처 도달 가능 지점으로 대체.
+`ProjectPointToNavigation()`으로 NavMesh에 투영합니다.
+
+배정된 쪽이 NavMesh 밖이면(실내 맵은 한쪽으로만 우회로가 있는 경우가 많음) **반대쪽을 시도**하고,
+양쪽 다 실패하면 플레이어 주변의 도달 가능한 지점으로 대체합니다.
 
 ### 콜아웃 — `Broadcast()`
 
@@ -185,6 +244,9 @@ Source/ProjectTF/
 | 화면 좌상단 | 콜아웃 `[Enemy_1] Flanking left!` (3초) |
 | 적 머리 위 | `Enemy_1  [Engage]  Suppressor  LOS` |
 | 월드 | 탄도 라인(노랑), 명중 지점(빨강 구), 벽 명중(흰 점) |
+| 로그 (`LogProjectTF`) | `CQB: spawned 3 enemies`, `CQB: Enemy_1  Engage -> Cover`, `CQB callout: [Enemy_1] Suppressing!` |
+
+로그만으로도 AI 동작을 추적할 수 있어서, 화면 없이 돌려도(`-game -nullrhi`) 상태 전이를 확인할 수 있습니다.
 
 적 무기는 `bShowDebugMessages = false`라 화면 텍스트를 오염시키지 않습니다.
 

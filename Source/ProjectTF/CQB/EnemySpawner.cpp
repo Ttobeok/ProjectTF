@@ -5,6 +5,7 @@
 #include "Components/ArrowComponent.h"
 #include "Engine/World.h"
 #include "NavigationSystem.h"
+#include "ProjectTF.h"
 
 AEnemySpawner::AEnemySpawner()
 {
@@ -71,4 +72,6 @@ void AEnemySpawner::SpawnEnemies()
 			SpawnedEnemies.Add(Enemy);
 		}
 	}
+
+	UE_LOG(LogProjectTF, Log, TEXT("CQB: spawned %d enemies"), SpawnedEnemies.Num());
 }

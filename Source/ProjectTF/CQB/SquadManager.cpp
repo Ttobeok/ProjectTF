@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "NavigationSystem.h"
+#include "ProjectTF.h"
 
 ASquadManager::ASquadManager()
 {
@@ -119,34 +120,45 @@ FVector ASquadManager::GetFlankPoint(AEnemyAIController* Enemy, AActor* Player) 
 	}
 
 	// rotate that direction 90 degrees around the player, to the assigned side
-	const float Side = (Enemy->GetSquadRole() == ESquadRole::FlankerLeft) ? -1.0f : 1.0f;
-	const FVector SideDirection = FVector::CrossProduct(FVector::UpVector, PlayerToEnemy) * Side;
+	const float PreferredSide = (Enemy->GetSquadRole() == ESquadRole::FlankerLeft) ? -1.0f : 1.0f;
+	const FVector SideDirection = FVector::CrossProduct(FVector::UpVector, PlayerToEnemy).GetSafeNormal();
 
-	const FVector DesiredPoint = PlayerLocation + SideDirection.GetSafeNormal() * FlankDistance;
+	const FVector PreferredPoint = PlayerLocation + SideDirection * PreferredSide * FlankDistance;
 
 	// drop it onto the NavMesh so the move order can actually be pathed
 	if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
 	{
+		const FVector ProjectionExtent(500.0f, 500.0f, 500.0f);
 		FNavLocation Projected;
-		if (NavSys->ProjectPointToNavigation(DesiredPoint, Projected, FVector(400.0f, 400.0f, 500.0f)))
+
+		if (NavSys->ProjectPointToNavigation(PreferredPoint, Projected, ProjectionExtent))
 		{
 			return Projected.Location;
 		}
 
-		// the exact side point is off the mesh, settle for something near it
+		// indoor maps often only have a route around one side, so take the other one
+		const FVector OppositePoint = PlayerLocation - SideDirection * PreferredSide * FlankDistance;
+		if (NavSys->ProjectPointToNavigation(OppositePoint, Projected, ProjectionExtent))
+		{
+			return Projected.Location;
+		}
+
+		// neither side is navigable, settle for something near the player
 		if (NavSys->GetRandomReachablePointInRadius(PlayerLocation, FlankDistance, Projected))
 		{
 			return Projected.Location;
 		}
 	}
 
-	return DesiredPoint;
+	return PreferredPoint;
 }
 
 void ASquadManager::Broadcast(ECalloutType Callout, AEnemyAIController* Enemy)
 {
 	const FString SpeakerName = Enemy ? Enemy->GetDisplayName() : TEXT("Squad");
 	const FString Line = FString::Printf(TEXT("[%s] %s"), *SpeakerName, *FCQBNames::CalloutToString(Callout));
+
+	UE_LOG(LogProjectTF, Log, TEXT("CQB callout: %s"), *Line);
 
 	if (GEngine)
 	{
