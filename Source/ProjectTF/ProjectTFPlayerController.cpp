@@ -2,6 +2,7 @@
 
 
 #include "ProjectTFPlayerController.h"
+#include "CQB/CQBHUD.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
@@ -18,6 +19,13 @@ AProjectTFPlayerController::AProjectTFPlayerController()
 
 void AProjectTFPlayerController::BeginPlay()
 {
+	// The game mode blueprint still carries the template HUD class, so claim the HUD here.
+	// This is what puts the crosshair and the ammo readout on screen.
+	if (!GetHUD() || !GetHUD()->IsA(ACQBHUD::StaticClass()))
+	{
+		ClientSetHUD(ACQBHUD::StaticClass());
+	}
+
 	Super::BeginPlay();
 
 	

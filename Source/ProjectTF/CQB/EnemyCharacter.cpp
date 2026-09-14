@@ -7,6 +7,7 @@
 #include "EnemyAIController.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
@@ -29,13 +30,25 @@ AEnemyCharacter::AEnemyCharacter()
 		GetMesh()->SetSkeletalMesh(MeshAsset.Object);
 	}
 
-	static ConstructorHelpers::FClassFinder<UAnimInstance> AnimAsset(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed"));
+	// rifle pose rather than empty hands, so the enemies read as armed at a glance
+	static ConstructorHelpers::FClassFinder<UAnimInstance> AnimAsset(TEXT("/Game/Variant_Shooter/Anims/ABP_TP_Rifle"));
 	if (AnimAsset.Succeeded())
 	{
 		GetMesh()->SetAnimInstanceClass(AnimAsset.Class);
 	}
 
 	GetMesh()->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, -96.0f), FRotator(0.0f, -90.0f, 0.0f));
+
+	// weapon in the right hand, matching the socket the template animations grip with
+	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Weapon Mesh"));
+	WeaponMesh->SetupAttachment(GetMesh(), FName("HandGrip_R"));
+	WeaponMesh->SetCollisionProfileName(FName("NoCollision"));
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> RifleMesh(TEXT("/Game/Weapons/Rifle/Meshes/SM_Rifle.SM_Rifle"));
+	if (RifleMesh.Succeeded())
+	{
+		WeaponMesh->SetStaticMesh(RifleMesh.Object);
+	}
 
 	// gameplay components, the same ones the player uses
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("Health Component"));
@@ -115,6 +128,12 @@ void AEnemyCharacter::OnEnemyDeath(AActor* DeadActor, AActor* Killer)
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->DisableMovement();
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// let the weapon drop with the body
+	if (WeaponMesh)
+	{
+		WeaponMesh->SetVisibility(bRagdollOnDeath);
+	}
 
 	if (bRagdollOnDeath)
 	{

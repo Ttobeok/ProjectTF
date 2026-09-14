@@ -71,6 +71,14 @@ void AEnemySpawner::EnsureNavigationBuilt()
 		}
 	}
 
+	// Navigation building starts out locked, and a locked system drops every build request on
+	// the floor without touching a single tile. Clear the locks before asking for the build.
+	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::InitialLock);
+	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::NoUpdateInEditor);
+	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::NoUpdateInPIE);
+	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::Custom);
+	UNavigationSystemV1::SetNavigationAutoUpdateEnabled(true, NavSys);
+
 	// The navmesh is spawned during world init, which can happen before the bounds volumes
 	// register, leaving the tile generator holding an empty set of bounds. Re-announcing the
 	// volumes refreshes it and marks the tiles dirty so the build below has something to do.

@@ -13,6 +13,7 @@ class UCameraComponent;
 class UInputAction;
 class UHealthComponent;
 class UWeaponComponent;
+class UStaticMeshComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -41,6 +42,10 @@ class AProjectTFCharacter : public ACharacter
 	/** Hitscan weapon shared with the AI enemies */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UWeaponComponent* WeaponComponent;
+
+	/** Visible weapon, attached to the first person hands */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	UStaticMeshComponent* WeaponMesh;
 
 protected:
 
@@ -191,5 +196,8 @@ public:
 
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
+
+	/** Returns the visible weapon mesh **/
+	UStaticMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 
 };

@@ -12,6 +12,8 @@
 #include "ProjectTF.h"
 #include "CQB/HealthComponent.h"
 #include "CQB/WeaponComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "UObject/ConstructorHelpers.h"
 
 AProjectTFCharacter::AProjectTFCharacter()
 {
@@ -44,6 +46,21 @@ AProjectTFCharacter::AProjectTFCharacter()
 	WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("Weapon Component"));
 	WeaponComponent->AimSpreadHalfAngle = 0.25f;
 	WeaponComponent->bApplyRecoilToController = true;
+
+	// visible weapon in the first person hands. An FPS with empty hands reads as broken,
+	// so this is attached in C++ rather than left to a blueprint.
+	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Weapon Mesh"));
+	WeaponMesh->SetupAttachment(FirstPersonMesh, FName("HandGrip_R"));
+	WeaponMesh->SetOnlyOwnerSee(true);
+	WeaponMesh->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
+	WeaponMesh->SetCollisionProfileName(FName("NoCollision"));
+	WeaponMesh->SetCastShadow(false);
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> RifleMesh(TEXT("/Game/Weapons/Rifle/Meshes/SM_Rifle.SM_Rifle"));
+	if (RifleMesh.Succeeded())
+	{
+		WeaponMesh->SetStaticMesh(RifleMesh.Object);
+	}
 
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);

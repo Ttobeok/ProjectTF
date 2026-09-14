@@ -8,6 +8,7 @@
 
 class UHealthComponent;
 class UWeaponComponent;
+class UStaticMeshComponent;
 
 /**
  *  AI controlled enemy.
@@ -26,6 +27,10 @@ class PROJECTTF_API AEnemyCharacter : public ACharacter
 	/** Hitscan weapon shared with the player character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UWeaponComponent* WeaponComponent;
+
+	/** Visible weapon in the right hand */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UStaticMeshComponent* WeaponMesh;
 
 public:
 

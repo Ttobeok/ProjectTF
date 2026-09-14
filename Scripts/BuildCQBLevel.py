@@ -258,22 +258,23 @@ def build_nav_bounds(center, extent):
 
 def configure_navmesh():
     """
-    Drop the RecastNavMesh actor the editor creates for the bounds volume.
+    Switch the level navmesh to dynamic generation.
 
-    That actor is saved holding no tile data, because nothing ever ran Build Paths on it, and
-    it is saved on Static generation, which means no generator is ever constructed. The
-    navigation system then sees existing nav data, skips generation, and every AI move request
-    fails silently. With no navmesh actor in the level the runtime spawns one itself and
-    rebuilds it on load, which takes a fraction of a second on a level this size.
+    The editor creates a RecastNavMesh actor for the bounds volume and saves it with no tile
+    data, because nothing ever ran Build Paths on it. Keeping the actor matters: the navigation
+    system decides at world init whether to keep a geometry octree at all, and it only does so
+    when nav data that supports rebuilding already exists. Dynamic generation gives it both.
     """
-    removed = 0
     for actor in editor_actor.get_all_level_actors():
-        if actor.get_class().get_name() == "RecastNavMesh":
-            editor_actor.destroy_actor(actor)
-            removed += 1
+        if actor.get_class().get_name() != "RecastNavMesh":
+            continue
 
-    unreal.log("NAVMESH removed empty RecastNavMesh actors: %d" % removed)
-    return removed > 0
+        actor.set_editor_property("runtime_generation", unreal.RuntimeGenerationType.DYNAMIC)
+        unreal.log("NAVMESH runtime_generation=" + str(actor.get_editor_property("runtime_generation")))
+        return actor
+
+    unreal.log_warning("NAVMESH no RecastNavMesh actor found")
+    return None
 
 
 def main():
