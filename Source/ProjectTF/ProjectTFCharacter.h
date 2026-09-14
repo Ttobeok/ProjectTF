@@ -14,6 +14,7 @@ class UInputAction;
 class UHealthComponent;
 class UWeaponComponent;
 class UStaticMeshComponent;
+class UNavigationInvokerComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -46,6 +47,10 @@ class AProjectTFCharacter : public ACharacter
 	/** Visible weapon, attached to the first person hands */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UStaticMeshComponent* WeaponMesh;
+
+	/** Keeps navmesh tiles generated around this character at runtime */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UNavigationInvokerComponent* NavigationInvoker;
 
 protected:
 

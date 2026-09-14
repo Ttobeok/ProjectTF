@@ -9,6 +9,7 @@
 class UHealthComponent;
 class UWeaponComponent;
 class UStaticMeshComponent;
+class UNavigationInvokerComponent;
 
 /**
  *  AI controlled enemy.
@@ -31,6 +32,10 @@ class PROJECTTF_API AEnemyCharacter : public ACharacter
 	/** Visible weapon in the right hand */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UStaticMeshComponent* WeaponMesh;
+
+	/** Keeps navmesh tiles generated around this character at runtime */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UNavigationInvokerComponent* NavigationInvoker;
 
 public:
 

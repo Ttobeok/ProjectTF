@@ -8,6 +8,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "NavigationInvokerComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
@@ -49,6 +50,10 @@ AEnemyCharacter::AEnemyCharacter()
 	{
 		WeaponMesh->SetStaticMesh(RifleMesh.Object);
 	}
+
+	// navmesh tiles are generated around invokers, which is what keeps the AI able to path
+	NavigationInvoker = CreateDefaultSubobject<UNavigationInvokerComponent>(TEXT("Navigation Invoker"));
+	NavigationInvoker->SetGenerationRadii(5000.0f, 7000.0f);
 
 	// gameplay components, the same ones the player uses
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("Health Component"));

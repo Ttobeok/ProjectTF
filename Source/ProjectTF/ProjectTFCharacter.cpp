@@ -13,6 +13,7 @@
 #include "CQB/HealthComponent.h"
 #include "CQB/WeaponComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "NavigationInvokerComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 AProjectTFCharacter::AProjectTFCharacter()
@@ -61,6 +62,10 @@ AProjectTFCharacter::AProjectTFCharacter()
 	{
 		WeaponMesh->SetStaticMesh(RifleMesh.Object);
 	}
+
+	// navmesh tiles are generated around invokers, which is what keeps the AI able to path
+	NavigationInvoker = CreateDefaultSubobject<UNavigationInvokerComponent>(TEXT("Navigation Invoker"));
+	NavigationInvoker->SetGenerationRadii(5000.0f, 7000.0f);
 
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);

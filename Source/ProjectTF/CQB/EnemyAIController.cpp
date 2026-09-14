@@ -212,6 +212,7 @@ void AEnemyAIController::Tick(float DeltaTime)
 	TimeInState += DeltaTime;
 
 	UpdateSenses(DeltaTime);
+	RetryFailedMove(DeltaTime);
 	UpdateGlobalTransitions(DeltaTime);
 	UpdateState(CurrentState, DeltaTime);
 
@@ -643,18 +644,52 @@ void AEnemyAIController::SetFacePlayerMode(bool bFacePlayer)
 
 void AEnemyAIController::MoveToPoint(const FVector& Goal)
 {
+	// a different goal starts its own retry budget
+	if (!Goal.Equals(CurrentGoal, 1.0f))
+	{
+		MoveRetryCount = 0;
+	}
+
 	CurrentGoal = Goal;
 	bHasGoal = true;
 
-	const EPathFollowingRequestResult::Type Result = MoveToLocation(Goal, 60.0f, true, true, true, true);
+	TimeSinceMoveRequest = 0.0f;
 
-	// a failed request almost always means there is no NavMesh under the goal, which quietly
-	// turns every state that moves into a no-op, so say so loudly instead
-	if (Result == EPathFollowingRequestResult::Failed)
+	const EPathFollowingRequestResult::Type Result = MoveToLocation(Goal, 60.0f, true, true, true, true);
+	bLastMoveFailed = (Result == EPathFollowingRequestResult::Failed);
+
+	// Navmesh tiles are generated around the characters and take a moment on level load, so an
+	// early request can fail on a goal that becomes reachable a second later. Tick retries it.
+	if (bLastMoveFailed)
 	{
-		UE_LOG(LogProjectTF, Warning, TEXT("CQB: %s could not path to %s. Is the NavMesh built?"),
-			*DisplayName, *Goal.ToCompactString());
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB: %s could not path to %s (retry %d). Is the NavMesh built?"),
+			*DisplayName, *Goal.ToCompactString(), MoveRetryCount);
 	}
+}
+
+void AEnemyAIController::RetryFailedMove(float DeltaTime)
+{
+	if (!bHasGoal || !bLastMoveFailed)
+	{
+		return;
+	}
+
+	TimeSinceMoveRequest += DeltaTime;
+
+	if (TimeSinceMoveRequest < MoveRetryInterval)
+	{
+		return;
+	}
+
+	if (MoveRetryCount >= MaxMoveRetries)
+	{
+		// give up quietly; the state machine treats the goal as reached and moves on
+		bLastMoveFailed = false;
+		return;
+	}
+
+	++MoveRetryCount;
+	MoveToPoint(CurrentGoal);
 }
 
 bool AEnemyAIController::HasReachedGoal(float Tolerance) const
@@ -668,6 +703,12 @@ bool AEnemyAIController::HasReachedGoal(float Tolerance) const
 	if (FVector::Dist2D(MyPawn->GetActorLocation(), CurrentGoal) <= Tolerance)
 	{
 		return true;
+	}
+
+	// still trying to get a path to this goal, so we have definitely not arrived
+	if (bLastMoveFailed && MoveRetryCount < MaxMoveRetries)
+	{
+		return false;
 	}
 
 	// path following gave up or never found a path: treat it as arrived so the state can move on

@@ -8,6 +8,9 @@
 #include "NavMesh/RecastNavMesh.h"
 #include "NavMesh/NavMeshBoundsVolume.h"
 #include "EngineUtils.h"
+#include "Components/BrushComponent.h"
+#include "Engine/Polys.h"
+#include "GameFramework/WorldSettings.h"
 #include "ProjectTF.h"
 
 AEnemySpawner::AEnemySpawner()
@@ -59,6 +62,21 @@ void AEnemySpawner::EnsureNavigationBuilt()
 	}
 
 	UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: no navmesh under the spawner, rebuilding at runtime"));
+
+	if (const AWorldSettings* WorldSettings = GetWorld()->GetWorldSettings())
+	{
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: world settings config=%s"),
+			*GetNameSafe(WorldSettings->GetNavigationSystemConfig()));
+	}
+
+	for (TActorIterator<ANavMeshBoundsVolume> It(GetWorld()); It; ++It)
+	{
+		const UBrushComponent* BrushComp = It->GetBrushComponent();
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: volume %s brush=%s polys=%d"),
+			*It->GetName(),
+			BrushComp && BrushComp->Brush ? TEXT("yes") : TEXT("NONE"),
+			BrushComp && BrushComp->Brush && BrushComp->Brush->Polys ? BrushComp->Brush->Polys->Element.Num() : -1);
+	}
 
 	// Report what the navmesh is set to. Static generation builds no generator at all, so
 	// RebuildAll and Build() silently do nothing; the level must not ship an empty Static navmesh.

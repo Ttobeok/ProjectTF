@@ -134,6 +134,9 @@ protected:
 	/** True once the pawn is close enough to the goal, or the path following gave up */
 	bool HasReachedGoal(float Tolerance = 140.0f) const;
 
+	/** Re-issues a move order that could not be pathed, while the navmesh finishes generating */
+	void RetryFailedMove(float DeltaTime);
+
 	/** Runs the cover EQS when one is assigned, otherwise samples the NavMesh in C++ */
 	void FindCoverPoint();
 
@@ -217,6 +220,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Combat")
 	TObjectPtr<UEnvQuery> CoverQuery;
 
+	/** Seconds between retries of a move request that could not be pathed */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Combat")
+	float MoveRetryInterval = 0.5f;
+
+	/** How many times a move request is retried before the goal is abandoned */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Combat")
+	int32 MaxMoveRetries = 12;
+
 	/** Draw the state name over the pawn */
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Debug")
 	bool bDrawStateDebug = true;
@@ -242,6 +253,15 @@ protected:
 	FVector CurrentGoal = FVector::ZeroVector;
 
 	bool bHasGoal = false;
+
+	/** True when the last move request could not be pathed, usually a navmesh that is still building */
+	bool bLastMoveFailed = false;
+
+	/** Seconds since the last move request, used to pace retries */
+	float TimeSinceMoveRequest = 0.0f;
+
+	/** How many times the current goal has been retried */
+	int32 MoveRetryCount = 0;
 	bool bHasLineOfSight = false;
 	bool bHasSeenPlayerOnce = false;
 	bool bFlankCompleted = false;
