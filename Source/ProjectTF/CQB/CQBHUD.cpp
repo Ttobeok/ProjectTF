@@ -153,7 +153,9 @@ void ACQBHUD::DrawSquadBar()
 	const TArray<AAllyAIController*> Squad = Player->GetSquad();
 	const ESquadElement Selected = Player->GetSelectedElement();
 
-	float RowY = Canvas->SizeY - 190.0f;
+	// Left hand side: the weapon view model owns the bottom right corner of the screen.
+	const float RosterX = 40.0f;
+	float RowY = Canvas->SizeY - 250.0f;
 
 	for (const AAllyAIController* Member : Squad)
 	{
@@ -191,16 +193,10 @@ void ACQBHUD::DrawSquadBar()
 		const FLinearColor ElementColour = (Member->GetElement() == ESquadElement::Red)
 			? FLinearColor(1.0f, 0.45f, 0.45f) : FLinearColor(0.45f, 0.65f, 1.0f);
 
-		const FString Row = FString::Printf(TEXT("%-4s %-8s %-5s %s"),
-			*FCQBNames::ElementToString(Member->GetElement()),
-			*Member->GetDisplayName(),
-			*Status,
-			*Member->GetOrderName());
-
-		DrawText(Row, ElementColour * Dim, Canvas->SizeX - 330.0f, RowY, Font, 0.95f);
-
-		// status word in its own colour, over the placeholder in the row
-		DrawText(Status, StatusColour * Dim, Canvas->SizeX - 330.0f + 118.0f, RowY, Font, 0.95f);
+		// three columns, drawn separately so the condition can carry its own colour
+		DrawText(Member->GetDisplayName(), ElementColour * Dim, RosterX, RowY, Font, 0.95f);
+		DrawText(Status, StatusColour * Dim, RosterX + 80.0f, RowY, Font, 0.95f);
+		DrawText(Member->GetOrderName(), FLinearColor(0.8f, 0.8f, 0.85f) * Dim, RosterX + 145.0f, RowY, Font, 0.95f);
 
 		RowY += 22.0f;
 	}
@@ -210,7 +206,7 @@ void ACQBHUD::DrawSquadBar()
 	const FLinearColor ElementLineColour = (Selected == ESquadElement::Red) ? FLinearColor(1.0f, 0.45f, 0.45f)
 		: (Selected == ESquadElement::Blue ? FLinearColor(0.45f, 0.65f, 1.0f) : FLinearColor(1.0f, 0.85f, 0.4f));
 
-	DrawText(ElementLine, ElementLineColour, Canvas->SizeX - 330.0f, RowY + 6.0f, Font, 1.0f);
+	DrawText(ElementLine, ElementLineColour, RosterX, RowY + 6.0f, Font, 1.0f);
 
 	// context hint under the crosshair
 	FString Hint;

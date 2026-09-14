@@ -142,6 +142,13 @@ EQS 에셋 없이 동작하는 엄폐 탐색. NavMesh 24지점 샘플링 → 플
 | `Hold` | H | 제자리 정지, 적 보이면 교전 |
 | `Stack` | 문 조준 + 1 | 배정된 좌/우 스택 지점으로, 도착 시 "In position" |
 | `Clear` | 문 조준 + 2 | 문 너머 방 중심으로 진입, 3초간 적 없으면 "Room clear!" → Follow |
+| `Watch` | 지점 조준 + 3 | 제자리에서 그 지점을 계속 주시 |
+
+**분대는 4명, Red 2 / Blue 2입니다.** 마우스 휠로 지휘 대상을 RED → BLUE → GOLD(전체)로
+순환합니다. 명령은 선택된 element에만 갑니다 — Blue가 문에 스택하는 동안 Red는 복도를 지키는 식.
+`AAllyAIController::OnPossess()`가 짝/홀로 element를 배정하고 `RED_1` ~ `BLU_2`로 이름을 붙입니다.
+
+명령이 떨어지면 **바닥에 element 색 링**이 4초간 그려집니다 (`DrawOrderMarker`).
 
 ### 명령과 전투의 관계
 
@@ -161,7 +168,43 @@ EQS 에셋 없이 동작하는 엄폐 탐색. NavMesh 24지점 샘플링 → 플
 
 ---
 
-## 5. ADoorwayMarker — 명령의 대상
+## 5. 항복·제압 — 이 샘플이 슈터가 아닌 이유
+
+플레이어가 용의자를 조준하고 **F**를 누르면 "Drop the weapon!"을 외칩니다.
+AI가 그 자리에서 판단합니다 — `AEnemyAIController::ReceiveChallenge()`.
+
+### 순응 압력 계산 `EvaluateCompliance()`
+
+| 요인 | 가중치 | 근거 |
+|---|---|---|
+| 부상 정도 | 최대 1.0 | 체력이 60% 아래로 떨어진 만큼 비례 |
+| 외침 거리 | 최대 0.5 | 1200 이내에서 가까울수록 |
+| 고립 | +0.4 | 같은 편이 전부 죽거나 항복했으면 |
+| 시야 없음 | -0.3 | 상대가 안 보이면 덜 위협적 |
+| 조준당함 | +0.35 | 플레이어가 직접 겨누고 외칠 때 |
+
+합계가 `ComplianceThreshold`(1.0)를 넘으면 항복합니다.
+
+### 실측 (헤드리스 3회)
+
+```
+만체력 / 동료 생존 / 1689 거리   →  0.35 / 1.00   "Not a chance!"
+만체력 / 고립 / 675 거리         →  0.97 / 1.00   거부 (간발의 차)
+30% 체력 / 고립 / 307 거리       →  1.22 / 1.00   "Hands up, I give up!"
+```
+
+**동전 던지기가 아니라 상황을 읽습니다.** 0.97로 버티는 케이스가 이 시스템의 값어치입니다.
+
+### 항복 후
+
+`Surrender` 상태는 **되돌아오지 않습니다** (`UpdateGlobalTransitions` 첫 줄에서 차단).
+무기를 숨기고 무릎 높이로 내려앉으며, `IsHostile()`이 false를 반환해
+**양 진영 AI가 모두 사격을 멈춥니다.** 손 든 사람을 분대원이 쏘지 않는 이유입니다.
+분대 역할을 들고 있었다면 반납해서 남은 적들이 재배정받습니다.
+
+---
+
+## 6. ADoorwayMarker — 명령의 대상
 
 액터의 **forward 벡터가 진입 방향**입니다. 에디터에서 회전만 시키면 방향이 정해집니다.
 
@@ -179,7 +222,7 @@ GetClearPoint()             문 너머 450cm
 
 ---
 
-## 6. ASquadManager — 적 분대
+## 7. ASquadManager — 적 분대
 
 세 함수만 보면 됩니다. **적 전용입니다** — 아군은 플레이어가 직접 지휘하므로 등록하지 않습니다
 (`ShouldJoinSquad()`가 아군에서 false).
@@ -195,7 +238,7 @@ GetClearPoint()             문 너머 450cm
 
 ---
 
-## 7. 수정한 템플릿 파일 3개
+## 8. 수정한 템플릿 파일 3개
 
 | 파일 | 무엇을 |
 |---|---|
@@ -210,7 +253,7 @@ GetClearPoint()             문 너머 450cm
 
 ---
 
-## 8. 설계 선택과 이유
+## 9. 설계 선택과 이유
 
 | 선택 | 이유 |
 |---|---|
@@ -223,7 +266,7 @@ GetClearPoint()             문 너머 450cm
 
 ---
 
-## 9. 함정 모음 — 실제로 며칠 날린 것들
+## 10. 함정 모음 — 실제로 며칠 날린 것들
 
 읽는 사람이 같은 데 빠지지 않도록 적어둡니다.
 
@@ -247,7 +290,7 @@ GetClearPoint()             문 너머 450cm
 
 ---
 
-## 10. 직접 돌려볼 때
+## 11. 직접 돌려볼 때
 
 ```bash
 # AI 전체 시퀀스 (로그만)
@@ -256,9 +299,12 @@ ProjectTF.exe -game -nullrhi -unattended -stdout
 # 아군 사망 → 역할 재배정
 ProjectTF.exe ... -CQBKillEnemyAfter=10
 
-# 분대 명령 (0=방A 문, 1=방B 문)
+# 분대 명령 (0=방A 문, 1=방B 문). stack / clear / watch / hold / follow / challenge
 ProjectTF.exe ... -CQBOrder=stack -CQBOrderAfter=8 -CQBOrderDoor=1
 ProjectTF.exe ... -CQBOrder=clear -CQBOrderAfter=8 -CQBOrderDoor=0
+
+# 항복 검증: 3명을 70% 깎고 9초 뒤 가장 가까운 용의자에게 외침
+ProjectTF.exe ... -CQBKillEnemyAfter=5 -CQBKillCount=3 -CQBKillDamage=0.7                   -CQBOrder=challenge -CQBOrderAfter=9
 
 # 스크린샷
 ProjectTF.exe -game -windowed -CQBScreenshotAfter=5
@@ -271,7 +317,7 @@ log LogProjectTF Verbose
 
 ---
 
-## 11. 검증된 시퀀스 (헤드리스 로그)
+## 12. 검증된 시퀀스 (헤드리스 로그)
 
 **적 분대 교전**
 ```
@@ -284,13 +330,23 @@ Enemy_2  Flank -> Engage               측면 지점 도착
 Enemy_3  Engage -> Cover -> Suppress   3번째 = Suppressor
 ```
 
+**항복**
+```
+CQB debug: challenging EnemyCharacter_0 at 307
+Enemy_1  Suppress -> Surrender
+[Enemy_1] Hands up, I give up!     surrendered (1.22 of 1.00)
+```
+
 **아군 명령**
 ```
 scripted order 'stack' on Room B
-Ally_1/2  Follow -> Stack   →  [Ally_1] In position   [Ally_2] In position
+RED_1/2, BLU_1/2  Follow -> Stack   →  전원 In position
 
 scripted order 'clear' on Room A
 Ally_1/2  Follow -> Clear   →  [Ally_1] Room clear!  →  Clear -> Follow
+
+scripted order 'watch' on Room B
+RED_1/2, BLU_1/2  Follow -> Watch   →  전원 "Watching that"
 ```
 
 **시야 상실 / 아군 사망**
@@ -301,7 +357,7 @@ Ally_1/2  Follow -> Clear   →  [Ally_1] Room clear!  →  Clear -> Follow
 
 ---
 
-## 12. 구조 정리 — 무엇이 어디에 있나
+## 13. 구조 정리 — 무엇이 어디에 있나
 
 ```
 ┌─ Config (.ini)          프로젝트 전역. 재시작 필요
@@ -346,7 +402,7 @@ Blueprint Class → AEnemyCharacter     → BP_Enemy
 
 ---
 
-## 13. 아직 안 열어둔 것
+## 14. 아직 안 열어둔 것
 
 - **BP 확장 훅 없음** (`BlueprintImplementableEvent` 0개) — 사운드·머즐 플래시를 BP에서 붙일 자리가 없습니다.
   붙인다면 `OnStateChanged` / `OnCalloutSpoken` / `OnWeaponFired` / `OnEnemyDied`.
