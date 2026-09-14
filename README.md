@@ -330,11 +330,30 @@ CQB 구현은 기본 First Person 경로에 붙어 있고, 사격은 발사체�
 # 에디터 타깃 (에디터 종료 후 — Live Coding이 잡고 있으면 UBT가 거부)
 Build.bat ProjectTFEditor Win64 Development -Project="...\ProjectTF.uproject"
 
-# 패키징 (Development, CQB 맵만 쿡, pak 압축)
+# 패키징 (Development, CQB 맵만 쿡, pak 압축, 심볼 제외)
 RunUAT.bat BuildCookRun -project="...\ProjectTF.uproject" -noP4 -platform=Win64 \
   -clientconfig=Development -cook -build -stage -pak -compressed -archive \
-  -archivedirectory="...\Packaged" -map=/Game/CQB/Lvl_CQB
+  -archivedirectory="...\Packaged" -nodebuginfo
 ```
+
+**`-clientconfig=Development`를 Shipping으로 바꾸지 마세요.** 실행 파일은 절반으로 줄지만
+`ENABLE_DRAW_DEBUG`가 0이 되어 `DrawDebug*`가 통째로 컴파일에서 빠집니다. 적 머리 위 상태
+표시, 콜아웃, 명령 바닥 마커 — 이 샘플이 보여주려는 것이 전부 사라집니다. Test 구성도 같습니다.
+
+**아카이브 폴더는 먼저 비우세요.** 아카이브 단계는 기존 파일을 지우지 않습니다. 예전에 다른
+구성으로 만든 실행 파일이 남아 그대로 같이 담깁니다. `-nodebuginfo`를 빼면 228MB PDB도 들어갑니다.
+둘 다 겹쳐서 1.1GB가 나온 적이 있습니다.
+
+**패키징 후에는 반드시 실행해서 눈으로 확인하세요.** 쿠커가 C++ 소프트 경로를 따라가지 못해
+무기 메시와 애님 BP가 pak에서 빠진 적이 있습니다. 에디터에서는 멀쩡했고, 실패는 조용했습니다.
+자세한 것은 CODE_GUIDE 10절.
+
+```bash
+# 12초 뒤 스크린샷. 적 3명 한가운데에서 시작하므로 교전·상태 표시가 한 장에 담깁니다
+ProjectTF.exe -windowed -ResX=1280 -ResY=720 -CQBScreenshotAfter=12 -CQBPlayerAt=200,80,120
+# 결과: %LOCALAPPDATA%\ProjectTF\Saved\Screenshots\Windows\
+```
+
 
 에디터를 켠 채 코드를 고쳤다면 커맨드라인 대신 **Ctrl+Alt+F11**(Live Coding).
 단, **새 C++ 클래스를 추가했을 때는 Live Coding으로 등록되지 않아 에디터 재시작이 필요**합니다.
