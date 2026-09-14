@@ -1,6 +1,7 @@
 // CQB Sample - hand written AI state machine. No Behavior Tree involved.
 
 #include "EnemyAIController.h"
+#include "CQBTypes.h"
 #include "EnemyCharacter.h"
 #include "SquadManager.h"
 #include "WeaponComponent.h"
@@ -65,10 +66,13 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	// join the squad and take a name
-	if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+	// join the squad and take a name. The player's own squad is commanded directly instead.
+	if (ShouldJoinSquad())
 	{
-		Squad->RegisterEnemy(this);
+		if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+		{
+			Squad->RegisterEnemy(this);
+		}
 	}
 
 	if (UHealthComponent* Health = GetHealth())
@@ -78,8 +82,8 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 
 	SetFacePlayerMode(false);
 
-	CurrentState = EEnemyState::Idle;
-	EnterState(EEnemyState::Idle);
+	CurrentState = ECQBAIState::Idle;
+	EnterState(ECQBAIState::Idle);
 }
 
 void AEnemyAIController::OnUnPossess()
@@ -103,24 +107,32 @@ UHealthComponent* AEnemyAIController::GetHealth() const
 
 bool AEnemyAIController::IsInCombat() const
 {
-	return CurrentState == EEnemyState::Engage
-		|| CurrentState == EEnemyState::Cover
-		|| CurrentState == EEnemyState::Flank
-		|| CurrentState == EEnemyState::Suppress;
+	return CurrentState == ECQBAIState::Engage
+		|| CurrentState == ECQBAIState::Cover
+		|| CurrentState == ECQBAIState::Flank
+		|| CurrentState == ECQBAIState::Suppress;
 }
 
-bool AEnemyAIController::IsPlayerActor(const AActor* Actor) const
+bool AEnemyAIController::IsHostile(const AActor* Actor) const
 {
-	const APawn* AsPawn = Cast<const APawn>(Actor);
-	return AsPawn && AsPawn->GetController() && AsPawn->GetController()->IsA(APlayerController::StaticClass());
+	// a corpse is not a threat
+	if (const UHealthComponent* Health = UHealthComponent::FindHealthComponent(const_cast<AActor*>(Actor)))
+	{
+		if (Health->IsDead())
+		{
+			return false;
+		}
+	}
+
+	return FCQBFactions::AreHostile(Faction, FCQBFactions::GetFaction(Actor));
 }
 
 //~ Perception ---------------------------------------------------------------
 
 void AEnemyAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	// only the player matters in this sample
-	if (!IsPlayerActor(Actor))
+	// friendly contacts are not worth reacting to
+	if (!IsHostile(Actor))
 	{
 		return;
 	}
@@ -131,11 +143,11 @@ void AEnemyAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus
 	{
 		if (Stimulus.WasSuccessfullySensed())
 		{
-			PlayerTarget = Actor;
+			CurrentTarget = Actor;
 			bHasLineOfSight = true;
 			TimeWithoutLineOfSight = 0.0f;
-			LastKnownPlayerLocation = Actor->GetActorLocation();
-			LastStimulusLocation = LastKnownPlayerLocation;
+			LastKnownTargetLocation = Actor->GetActorLocation();
+			LastStimulusLocation = LastKnownTargetLocation;
 
 			// first time anyone sees the player
 			if (!bHasSeenPlayerOnce)
@@ -158,12 +170,12 @@ void AEnemyAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus
 		if (Stimulus.WasSuccessfullySensed())
 		{
 			// a gunshot is a reason to go and look, but it is not a sighting
-			PlayerTarget = Actor;
+			CurrentTarget = Actor;
 			LastStimulusLocation = Stimulus.StimulusLocation;
 
-			if (CurrentState == EEnemyState::Idle)
+			if (CurrentState == ECQBAIState::Idle)
 			{
-				SetState(EEnemyState::Investigate);
+				SetState(ECQBAIState::Investigate);
 			}
 		}
 	}
@@ -171,7 +183,7 @@ void AEnemyAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus
 
 void AEnemyAIController::UpdateSenses(float DeltaTime)
 {
-	if (!PlayerTarget)
+	if (!CurrentTarget)
 	{
 		bHasLineOfSight = false;
 		return;
@@ -179,14 +191,14 @@ void AEnemyAIController::UpdateSenses(float DeltaTime)
 
 	// perception drives acquisition through the vision cone; this confirms the sight line
 	// every frame so ducking behind cover registers immediately instead of on the next update
-	if (bHasLineOfSight && !LineOfSightTo(PlayerTarget))
+	if (bHasLineOfSight && !LineOfSightTo(CurrentTarget))
 	{
 		bHasLineOfSight = false;
 	}
 
 	if (bHasLineOfSight)
 	{
-		LastKnownPlayerLocation = PlayerTarget->GetActorLocation();
+		LastKnownTargetLocation = CurrentTarget->GetActorLocation();
 	}
 }
 
@@ -221,16 +233,16 @@ void AEnemyAIController::Tick(float DeltaTime)
 
 void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 {
-	// a dead player ends the fight
-	if (PlayerTarget)
+	// a dead target ends the fight
+	if (CurrentTarget)
 	{
-		if (const UHealthComponent* PlayerHealth = UHealthComponent::FindHealthComponent(PlayerTarget))
+		if (const UHealthComponent* PlayerHealth = UHealthComponent::FindHealthComponent(CurrentTarget))
 		{
 			if (PlayerHealth->IsDead())
 			{
-				if (CurrentState != EEnemyState::Idle)
+				if (CurrentState != ECQBAIState::Idle)
 				{
-					SetState(EEnemyState::Idle);
+					SetState(ECQBAIState::Idle);
 				}
 				return;
 			}
@@ -241,9 +253,9 @@ void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 	{
 		TimeWithoutLineOfSight = 0.0f;
 
-		if (CurrentState == EEnemyState::Idle || CurrentState == EEnemyState::Investigate)
+		if (CurrentState == ECQBAIState::Idle || CurrentState == ECQBAIState::Investigate)
 		{
-			SetState(EEnemyState::Engage);
+			SetState(ECQBAIState::Engage);
 		}
 
 		return;
@@ -252,7 +264,7 @@ void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 	// lost the player for too long: fall back to searching the last known position.
 	// Flank is exempt: breaking the sight line is the whole point of going around,
 	// and the flanking route is long enough that this rule would cancel every flank.
-	if (IsInCombat() && CurrentState != EEnemyState::Flank)
+	if (IsInCombat() && CurrentState != ECQBAIState::Flank)
 	{
 		TimeWithoutLineOfSight += DeltaTime;
 
@@ -263,15 +275,15 @@ void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 				Squad->Broadcast(ECalloutType::LostVisual, this);
 			}
 
-			LastStimulusLocation = LastKnownPlayerLocation;
-			SetState(EEnemyState::Investigate);
+			LastStimulusLocation = LastKnownTargetLocation;
+			SetState(ECQBAIState::Investigate);
 		}
 	}
 }
 
 //~ State machine ------------------------------------------------------------
 
-void AEnemyAIController::SetState(EEnemyState NewState)
+void AEnemyAIController::SetState(ECQBAIState NewState)
 {
 	if (NewState == CurrentState)
 	{
@@ -287,42 +299,42 @@ void AEnemyAIController::SetState(EEnemyState NewState)
 	EnterState(CurrentState);
 }
 
-void AEnemyAIController::EnterState(EEnemyState State)
+void AEnemyAIController::EnterState(ECQBAIState State)
 {
 	switch (State)
 	{
-	case EEnemyState::Idle:			EnterIdle(); break;
-	case EEnemyState::Investigate:	EnterInvestigate(); break;
-	case EEnemyState::Engage:		EnterEngage(); break;
-	case EEnemyState::Cover:		EnterCover(); break;
-	case EEnemyState::Flank:		EnterFlank(); break;
-	case EEnemyState::Suppress:		EnterSuppress(); break;
+	case ECQBAIState::Idle:			EnterIdle(); break;
+	case ECQBAIState::Investigate:	EnterInvestigate(); break;
+	case ECQBAIState::Engage:		EnterEngage(); break;
+	case ECQBAIState::Cover:		EnterCover(); break;
+	case ECQBAIState::Flank:		EnterFlank(); break;
+	case ECQBAIState::Suppress:		EnterSuppress(); break;
 	}
 }
 
-void AEnemyAIController::UpdateState(EEnemyState State, float DeltaTime)
+void AEnemyAIController::UpdateState(ECQBAIState State, float DeltaTime)
 {
 	switch (State)
 	{
-	case EEnemyState::Idle:			UpdateIdle(DeltaTime); break;
-	case EEnemyState::Investigate:	UpdateInvestigate(DeltaTime); break;
-	case EEnemyState::Engage:		UpdateEngage(DeltaTime); break;
-	case EEnemyState::Cover:		UpdateCover(DeltaTime); break;
-	case EEnemyState::Flank:		UpdateFlank(DeltaTime); break;
-	case EEnemyState::Suppress:		UpdateSuppress(DeltaTime); break;
+	case ECQBAIState::Idle:			UpdateIdle(DeltaTime); break;
+	case ECQBAIState::Investigate:	UpdateInvestigate(DeltaTime); break;
+	case ECQBAIState::Engage:		UpdateEngage(DeltaTime); break;
+	case ECQBAIState::Cover:		UpdateCover(DeltaTime); break;
+	case ECQBAIState::Flank:		UpdateFlank(DeltaTime); break;
+	case ECQBAIState::Suppress:		UpdateSuppress(DeltaTime); break;
 	}
 }
 
-void AEnemyAIController::ExitState(EEnemyState State)
+void AEnemyAIController::ExitState(ECQBAIState State)
 {
 	switch (State)
 	{
-	case EEnemyState::Idle:			ExitIdle(); break;
-	case EEnemyState::Investigate:	ExitInvestigate(); break;
-	case EEnemyState::Engage:		ExitEngage(); break;
-	case EEnemyState::Cover:		ExitCover(); break;
-	case EEnemyState::Flank:		ExitFlank(); break;
-	case EEnemyState::Suppress:		ExitSuppress(); break;
+	case ECQBAIState::Idle:			ExitIdle(); break;
+	case ECQBAIState::Investigate:	ExitInvestigate(); break;
+	case ECQBAIState::Engage:		ExitEngage(); break;
+	case ECQBAIState::Cover:		ExitCover(); break;
+	case ECQBAIState::Flank:		ExitFlank(); break;
+	case ECQBAIState::Suppress:		ExitSuppress(); break;
 	}
 }
 
@@ -369,7 +381,7 @@ void AEnemyAIController::UpdateInvestigate(float DeltaTime)
 
 		if (InvestigateWaitTime >= InvestigateGiveUpTime)
 		{
-			SetState(EEnemyState::Idle);
+			SetState(ECQBAIState::Idle);
 		}
 	}
 }
@@ -387,9 +399,9 @@ void AEnemyAIController::EnterEngage()
 	StopMovement();
 	bHasGoal = false;
 
-	if (PlayerTarget)
+	if (CurrentTarget)
 	{
-		SetFocus(PlayerTarget, EAIFocusPriority::Gameplay);
+		SetFocus(CurrentTarget, EAIFocusPriority::Gameplay);
 	}
 
 	SetFiring(true);
@@ -416,11 +428,11 @@ void AEnemyAIController::UpdateEngage(float DeltaTime)
 
 	if (bIsFlanker && !bFlankCompleted)
 	{
-		SetState(EEnemyState::Flank);
+		SetState(ECQBAIState::Flank);
 	}
 	else
 	{
-		SetState(EEnemyState::Cover);
+		SetState(ECQBAIState::Cover);
 	}
 }
 
@@ -436,9 +448,9 @@ void AEnemyAIController::EnterCover()
 	SetFiring(false);
 	SetFacePlayerMode(true);
 
-	if (PlayerTarget)
+	if (CurrentTarget)
 	{
-		SetFocus(PlayerTarget, EAIFocusPriority::Gameplay);
+		SetFocus(CurrentTarget, EAIFocusPriority::Gameplay);
 	}
 
 	FindCoverPoint();
@@ -455,7 +467,7 @@ void AEnemyAIController::UpdateCover(float DeltaTime)
 	if (HasReachedGoal())
 	{
 		StopMovement();
-		SetState(EEnemyState::Suppress);
+		SetState(ECQBAIState::Suppress);
 	}
 }
 
@@ -471,19 +483,19 @@ void AEnemyAIController::EnterFlank()
 	SetFiring(false);
 	SetFacePlayerMode(true);
 
-	if (PlayerTarget)
+	if (CurrentTarget)
 	{
-		SetFocus(PlayerTarget, EAIFocusPriority::Gameplay);
+		SetFocus(CurrentTarget, EAIFocusPriority::Gameplay);
 	}
 
 	ASquadManager* Squad = ASquadManager::GetSquadManager(this);
-	if (!Squad || !PlayerTarget)
+	if (!Squad || !CurrentTarget)
 	{
-		SetState(EEnemyState::Cover);
+		SetState(ECQBAIState::Cover);
 		return;
 	}
 
-	const FVector FlankPoint = Squad->GetFlankPoint(this, PlayerTarget);
+	const FVector FlankPoint = Squad->GetFlankPoint(this, CurrentTarget);
 	MoveToPoint(FlankPoint);
 
 	Squad->Broadcast(SquadRole == ESquadRole::FlankerLeft ? ECalloutType::FlankingLeft : ECalloutType::FlankingRight, this);
@@ -497,7 +509,7 @@ void AEnemyAIController::UpdateFlank(float DeltaTime)
 
 		// one flank per fight, then hold and shoot
 		bFlankCompleted = true;
-		SetState(EEnemyState::Engage);
+		SetState(ECQBAIState::Engage);
 	}
 }
 
@@ -513,9 +525,9 @@ void AEnemyAIController::EnterSuppress()
 	StopMovement();
 	bHasGoal = false;
 
-	if (PlayerTarget)
+	if (CurrentTarget)
 	{
-		SetFocus(PlayerTarget, EAIFocusPriority::Gameplay);
+		SetFocus(CurrentTarget, EAIFocusPriority::Gameplay);
 	}
 
 	// start on a burst
@@ -559,10 +571,10 @@ void AEnemyAIController::OnCalloutReceived(ECalloutType Callout, AEnemyAIControl
 	}
 
 	// a squad mate spotting the player pulls idle enemies towards the contact
-	if (Callout == ECalloutType::Contact && CurrentState == EEnemyState::Idle)
+	if (Callout == ECalloutType::Contact && CurrentState == ECQBAIState::Idle)
 	{
-		LastStimulusLocation = From->GetLastKnownPlayerLocation();
-		SetState(EEnemyState::Investigate);
+		LastStimulusLocation = From->GetLastKnownTargetLocation();
+		SetState(ECQBAIState::Investigate);
 	}
 }
 
@@ -576,7 +588,7 @@ void AEnemyAIController::OnSquadRolesInvalidated()
 		return;
 	}
 
-	if (CurrentState == EEnemyState::Engage)
+	if (CurrentState == ECQBAIState::Engage)
 	{
 		// already engaging: just pick up the new role in place
 		TimeInState = 0.0f;
@@ -588,7 +600,7 @@ void AEnemyAIController::OnSquadRolesInvalidated()
 	}
 	else
 	{
-		SetState(EEnemyState::Engage);
+		SetState(ECQBAIState::Engage);
 	}
 }
 
@@ -740,7 +752,7 @@ void AEnemyAIController::FindCoverPoint()
 	else
 	{
 		// nowhere to hide, so shoot from where we stand
-		SetState(EEnemyState::Suppress);
+		SetState(ECQBAIState::Suppress);
 	}
 }
 
@@ -749,7 +761,7 @@ void AEnemyAIController::OnCoverQueryFinished(TSharedPtr<FEnvQueryResult> Result
 	bCoverPointPending = false;
 
 	// the state may have moved on while the query was running
-	if (CurrentState != EEnemyState::Cover)
+	if (CurrentState != ECQBAIState::Cover)
 	{
 		return;
 	}
@@ -767,7 +779,7 @@ void AEnemyAIController::OnCoverQueryFinished(TSharedPtr<FEnvQueryResult> Result
 	}
 	else
 	{
-		SetState(EEnemyState::Suppress);
+		SetState(ECQBAIState::Suppress);
 	}
 }
 
@@ -777,12 +789,12 @@ bool AEnemyAIController::FindCoverPointFallback(FVector& OutPoint) const
 	UWorld* World = GetWorld();
 	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 
-	if (!MyPawn || !World || !NavSys || !PlayerTarget)
+	if (!MyPawn || !World || !NavSys || !CurrentTarget)
 	{
 		return false;
 	}
 
-	const FVector PlayerEye = LastKnownPlayerLocation + FVector(0.0f, 0.0f, 60.0f);
+	const FVector PlayerEye = LastKnownTargetLocation + FVector(0.0f, 0.0f, 60.0f);
 	const FVector MyLocation = MyPawn->GetActorLocation();
 
 	float BestScore = -FLT_MAX;
@@ -797,7 +809,7 @@ bool AEnemyAIController::FindCoverPointFallback(FVector& OutPoint) const
 			continue;
 		}
 
-		if (FVector::Dist(Candidate.Location, LastKnownPlayerLocation) < MinCoverDistanceFromPlayer)
+		if (FVector::Dist(Candidate.Location, LastKnownTargetLocation) < MinCoverDistanceFromPlayer)
 		{
 			continue;
 		}
@@ -807,7 +819,7 @@ bool AEnemyAIController::FindCoverPointFallback(FVector& OutPoint) const
 
 		FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBCoverTrace), false);
 		Params.AddIgnoredActor(MyPawn);
-		Params.AddIgnoredActor(PlayerTarget);
+		Params.AddIgnoredActor(CurrentTarget);
 
 		FHitResult Hit;
 		const bool bBlocked = World->LineTraceSingleByChannel(Hit, PlayerEye, TestPoint, ECC_Visibility, Params);
@@ -847,7 +859,7 @@ void AEnemyAIController::DrawStateDebug(float DeltaTime) const
 		*FCQBNames::RoleToString(SquadRole),
 		bHasLineOfSight ? TEXT("  LOS") : TEXT(""));
 
-	const FColor Color = IsInCombat() ? FColor::Red : (CurrentState == EEnemyState::Investigate ? FColor::Yellow : FColor::White);
+	const FColor Color = IsInCombat() ? FColor::Red : (CurrentState == ECQBAIState::Investigate ? FColor::Yellow : FColor::White);
 
 	DrawDebugString(GetWorld(), MyPawn->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), Text, nullptr, Color, 0.0f, true);
 }

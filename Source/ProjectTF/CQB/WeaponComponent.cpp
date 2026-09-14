@@ -3,6 +3,7 @@
 #include "WeaponComponent.h"
 #include "WeaponData.h"
 #include "HealthComponent.h"
+#include "CQBTypes.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
@@ -209,7 +210,17 @@ void UWeaponComponent::Fire()
 	{
 		AActor* HitActor = Hit.GetActor();
 
-		if (UHealthComponent* TargetHealth = UHealthComponent::FindHealthComponent(HitActor))
+		// never shoot your own side. The AI aims with a cone, so a squad member crossing the
+		// line of fire is a matter of time rather than an accident.
+		const bool bFriendly = !FCQBFactions::AreHostile(Owner, HitActor)
+			&& FCQBFactions::GetFaction(HitActor) != ECQBFaction::Neutral;
+
+		if (bFriendly)
+		{
+			DebugMessage(SlotHit, FColor::Silver, FString::Printf(TEXT("[%s] holding fire, %s is friendly"),
+				*Owner->GetName(), *HitActor->GetName()));
+		}
+		else if (UHealthComponent* TargetHealth = UHealthComponent::FindHealthComponent(HitActor))
 		{
 			AController* InstigatorController = nullptr;
 			if (APawn* OwnerPawn = Cast<APawn>(Owner))

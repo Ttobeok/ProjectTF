@@ -13,6 +13,9 @@
 #include "CQB/HealthComponent.h"
 #include "CQB/WeaponComponent.h"
 #include "CQB/WeaponVisualComponent.h"
+#include "CQB/DoorwayMarker.h"
+#include "CQB/AllyAIController.h"
+#include "EngineUtils.h"
 #include "NavigationInvokerComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
@@ -93,6 +96,8 @@ void AProjectTFCharacter::Tick(float DeltaSeconds)
 	// blend the lean towards the requested side
 	CurrentLeanRoll = FMath::FInterpTo(CurrentLeanRoll, LeanTarget * LeanRollAngle, DeltaSeconds, LeanInterpSpeed);
 	CurrentLeanOffset = FMath::FInterpTo(CurrentLeanOffset, LeanTarget * LeanOffsetDistance, DeltaSeconds, LeanInterpSpeed);
+
+	UpdateAimedDoorway();
 
 
 
@@ -181,6 +186,12 @@ void AProjectTFCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 			PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AProjectTFCharacter::LeanRightStart);
 			PlayerInputComponent->BindKey(EKeys::E, IE_Released, this, &AProjectTFCharacter::LeanStop);
 		}
+
+		// squad commands
+		PlayerInputComponent->BindKey(EKeys::Z, IE_Pressed, this, &AProjectTFCharacter::CommandFollow);
+		PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &AProjectTFCharacter::CommandHold);
+		PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &AProjectTFCharacter::CommandStackOrOne);
+		PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &AProjectTFCharacter::CommandClearOrTwo);
 	}
 }
 
@@ -311,4 +322,107 @@ void AProjectTFCharacter::OnPlayerDeath(AActor* DeadActor, AActor* Killer)
 	}
 
 	GetCharacterMovement()->DisableMovement();
+}
+
+
+//~ Squad commands --------------------------------------------------------------
+
+void AProjectTFCharacter::UpdateAimedDoorway()
+{
+	AimedDoorway = nullptr;
+
+	const UWorld* World = GetWorld();
+	if (!World || !FirstPersonCameraComponent)
+	{
+		return;
+	}
+
+	const FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+	const FVector End = Start + GetBaseAimRotation().Vector() * DoorwayAimRange;
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBDoorwayAim), false, this);
+
+	FHitResult Hit;
+	if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+	{
+		AimedDoorway = Cast<ADoorwayMarker>(Hit.GetActor());
+	}
+}
+
+TArray<AAllyAIController*> AProjectTFCharacter::GetSquad() const
+{
+	TArray<AAllyAIController*> Squad;
+
+	for (TActorIterator<AAllyAIController> It(GetWorld()); It; ++It)
+	{
+		if (IsValid(*It) && It->GetPawn())
+		{
+			Squad.Add(*It);
+		}
+	}
+
+	return Squad;
+}
+
+FString AProjectTFCharacter::GetSquadOrderSummary() const
+{
+	FString Summary;
+
+	for (const AAllyAIController* Member : GetSquad())
+	{
+		if (!Summary.IsEmpty())
+		{
+			Summary += TEXT("   ");
+		}
+
+		Summary += FString::Printf(TEXT("%s: %s"), *Member->GetDisplayName(), *Member->GetOrderName());
+	}
+
+	return Summary;
+}
+
+void AProjectTFCharacter::CommandFollow()
+{
+	for (AAllyAIController* Member : GetSquad())
+	{
+		Member->OrderFollow();
+	}
+}
+
+void AProjectTFCharacter::CommandHold()
+{
+	for (AAllyAIController* Member : GetSquad())
+	{
+		Member->OrderHold();
+	}
+}
+
+void AProjectTFCharacter::CommandStackOrOne()
+{
+	if (!AimedDoorway)
+	{
+		return;
+	}
+
+	// the squad splits across the doorway, one side each
+	TArray<AAllyAIController*> Squad = GetSquad();
+
+	for (int32 Index = 0; Index < Squad.Num(); ++Index)
+	{
+		const EStackSide Side = (Index % 2 == 0) ? EStackSide::Left : EStackSide::Right;
+		Squad[Index]->OrderStack(AimedDoorway, Side);
+	}
+}
+
+void AProjectTFCharacter::CommandClearOrTwo()
+{
+	if (!AimedDoorway)
+	{
+		return;
+	}
+
+	for (AAllyAIController* Member : GetSquad())
+	{
+		Member->OrderClear(AimedDoorway);
+	}
 }

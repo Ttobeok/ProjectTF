@@ -235,6 +235,31 @@ def build_lighting():
         sky.set_actor_label("SkyAtmosphere")
 
 
+def build_doorways():
+    """
+    Markers the player aims at to give stack and clear orders.
+
+    The actor's forward vector is the way through, so each one faces the room it leads into.
+    """
+    doorway_class = unreal.load_class(None, "/Script/ProjectTF.DoorwayMarker")
+    if not doorway_class:
+        unreal.log_error("DoorwayMarker class not found: build the editor target first")
+        return
+
+    # (name, x, y, yaw)  yaw points from the near side into the room beyond
+    doorways = [
+        ("Doorway_RoomA", -800.0, -250.0, 0.0),    # entry corridor into room A, facing east
+        ("Doorway_RoomB", 100.0, 250.0, 0.0),      # the choke point door, facing room B
+    ]
+
+    for name, x, y, yaw in doorways:
+        marker = editor_actor.spawn_actor_from_class(doorway_class, unreal.Vector(x, y, 0.0), unreal.Rotator(0, yaw, 0))
+        if marker:
+            marker.set_actor_label(name)
+            marker.set_editor_property("doorway_name", name.replace("Doorway_", "").replace("Room", "Room "))
+            unreal.log("DOORWAY %s at (%s, %s) yaw=%s" % (name, x, y, yaw))
+
+
 def build_gameplay_actors():
     player_start = editor_actor.spawn_actor_from_class(
         unreal.PlayerStart, unreal.Vector(-1200.0, -250.0, 100.0), unreal.Rotator(0, 0, 0))
@@ -254,6 +279,22 @@ def build_gameplay_actors():
 
     # one enemy next to each piece of cover in room B, relative to the spawner at (600, 0)
     # note the spawner faces -X, so the offsets are rotated with it
+    # two squad members, a step behind the player
+    ally_class = unreal.load_class(None, "/Script/ProjectTF.AllyCharacter")
+    ally_spawner_class = unreal.load_class(None, "/Script/ProjectTF.EnemySpawner")
+
+    if ally_class and ally_spawner_class:
+        ally_spawner = editor_actor.spawn_actor_from_class(
+            ally_spawner_class, unreal.Vector(-1200.0, -250.0, 20.0), unreal.Rotator(0, 0, 0))
+
+        if ally_spawner:
+            ally_spawner.set_actor_label("AllySpawner")
+            ally_spawner.set_editor_property("enemy_class", ally_class)
+            ally_spawner.set_editor_property("spawn_offsets", [
+                unreal.Vector(-60.0, -90.0, 0.0),
+                unreal.Vector(-60.0, 90.0, 0.0),
+            ])
+
     spawner.set_editor_property("spawn_offsets", [
         unreal.Vector(170.0, -80.0, 0.0),    # -> world (430, 80)   next to Cover_B1
         unreal.Vector(-330.0, -150.0, 0.0),  # -> world (930, 150)  next to Cover_B2
@@ -327,6 +368,11 @@ def main():
     build_geometry()
     build_cover()
     build_gameplay_actors()
+
+    try:
+        build_doorways()
+    except Exception as error:
+        unreal.log_error("doorways failed: " + str(error))
 
     try:
         build_interior_lights()

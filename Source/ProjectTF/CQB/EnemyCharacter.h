@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "CQBTypes.h"
 #include "EnemyCharacter.generated.h"
 
 class UHealthComponent;
@@ -18,7 +19,7 @@ class UNavigationInvokerComponent;
  *  Ragdolls on death and is destroyed a few seconds later.
  */
 UCLASS()
-class PROJECTTF_API AEnemyCharacter : public ACharacter
+class PROJECTTF_API AEnemyCharacter : public ACharacter, public ICQBFactionAgent
 {
 	GENERATED_BODY()
 
@@ -51,6 +52,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Enemy")
 	bool IsDead() const { return bIsDead; }
 
+	//~Begin ICQBFactionAgent
+	virtual ECQBFaction GetFaction() const override { return Faction; }
+	//~End ICQBFactionAgent
+
 	UFUNCTION(BlueprintPure, Category = "Components")
 	UWeaponVisualComponent* GetWeaponVisual() const { return WeaponVisual; }
 
@@ -65,6 +70,10 @@ protected:
 
 	/** Removes the corpse */
 	void DeferredDestroy();
+
+	/** Side this character fights for. Subclasses change it to switch sides. */
+	UPROPERTY(EditAnywhere, Category = "Enemy")
+	ECQBFaction Faction = ECQBFaction::Enemy;
 
 	/** Ragdoll on death when true, plain Destroy otherwise */
 	UPROPERTY(EditAnywhere, Category = "Enemy")

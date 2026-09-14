@@ -51,6 +51,9 @@ protected:
 	/** Ammo counter bottom right, health bottom left */
 	void DrawReadout(const UWeaponComponent* Weapon, const UHealthComponent* Health);
 
+	/** Squad orders along the bottom, and the doorway hint when one is under the crosshair */
+	void DrawSquadBar();
+
 	/** Length of each crosshair tick, in pixels */
 	UPROPERTY(EditDefaultsOnly, Category = "Crosshair")
 	float TickLength = 10.0f;

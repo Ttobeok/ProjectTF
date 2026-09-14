@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "CQB/CQBTypes.h"
 #include "ProjectTFCharacter.generated.h"
 
 class UInputComponent;
@@ -14,6 +15,8 @@ class UInputAction;
 class UHealthComponent;
 class UWeaponComponent;
 class UWeaponVisualComponent;
+class ADoorwayMarker;
+class AAllyAIController;
 class UNavigationInvokerComponent;
 struct FInputActionValue;
 
@@ -24,7 +27,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
  *  Carries the CQB health and hitscan weapon components and handles fire / ADS / reload / lean input.
  */
 UCLASS(abstract)
-class AProjectTFCharacter : public ACharacter
+class AProjectTFCharacter : public ACharacter, public ICQBFactionAgent
 {
 	GENERATED_BODY()
 
@@ -121,6 +124,18 @@ public:
 	UFUNCTION(BlueprintPure, Category="Components")
 	UWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
 
+	//~Begin ICQBFactionAgent
+	virtual ECQBFaction GetFaction() const override { return ECQBFaction::Player; }
+	//~End ICQBFactionAgent
+
+	/** Doorway the player is currently aiming at, or null. Read by the HUD for the order hint. */
+	UFUNCTION(BlueprintPure, Category="Squad")
+	ADoorwayMarker* GetAimedDoorway() const { return AimedDoorway; }
+
+	/** Order every squad member is currently on, for the HUD */
+	UFUNCTION(BlueprintPure, Category="Squad")
+	FString GetSquadOrderSummary() const;
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -170,6 +185,27 @@ protected:
 	/** Sets the lean target. -1 leans left, 1 leans right, 0 straightens up. */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	void DoLean(float Direction);
+
+	//~ Squad commands. Z falls them in, H holds them, and aiming at a doorway turns 1 and 2
+	//~ into stack and clear orders for that doorway.
+	void CommandFollow();
+	void CommandHold();
+	void CommandStackOrOne();
+	void CommandClearOrTwo();
+
+	/** Traces from the camera for a doorway the player might be ordering against */
+	void UpdateAimedDoorway();
+
+	/** Every living squad member */
+	TArray<AAllyAIController*> GetSquad() const;
+
+	/** How far the player can be from a doorway and still give orders about it */
+	UPROPERTY(EditDefaultsOnly, Category="Squad")
+	float DoorwayAimRange = 1200.0f;
+
+	/** Doorway under the crosshair this frame */
+	UPROPERTY(Transient)
+	TObjectPtr<ADoorwayMarker> AimedDoorway;
 
 	void LeanLeftStart() { DoLean(-1.0f); }
 	void LeanRightStart() { DoLean(1.0f); }

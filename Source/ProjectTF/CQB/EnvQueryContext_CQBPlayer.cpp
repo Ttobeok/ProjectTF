@@ -19,7 +19,7 @@ void UEnvQueryContext_CQBPlayer::ProvideContext(FEnvQueryInstance& QueryInstance
 	// prefer the player this enemy is actually tracking
 	if (const AEnemyAIController* Controller = Cast<AEnemyAIController>(QueryOwner))
 	{
-		Target = Controller->GetPlayerTarget();
+		Target = Controller->GetCurrentTarget();
 	}
 
 	if (!Target)

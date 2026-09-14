@@ -24,7 +24,7 @@ struct FEnvQueryResult;
  *  Squad level decisions (who suppresses, who flanks, where to flank) come from ASquadManager.
  */
 UCLASS()
-class PROJECTTF_API AEnemyAIController : public AAIController
+class PROJECTTF_API AEnemyAIController : public AAIController, public ICQBFactionAgent
 {
 	GENERATED_BODY()
 
@@ -36,11 +36,11 @@ public:
 
 	/** Current state of the machine */
 	UFUNCTION(BlueprintPure, Category = "AI")
-	EEnemyState GetState() const { return CurrentState; }
+	ECQBAIState GetState() const { return CurrentState; }
 
 	/** Runs Exit on the old state and Enter on the new one. Re-entering the same state is ignored. */
 	UFUNCTION(BlueprintCallable, Category = "AI")
-	void SetState(EEnemyState NewState);
+	void SetState(ECQBAIState NewState);
 
 	/** Role handed out by the squad manager */
 	ESquadRole GetSquadRole() const { return SquadRole; }
@@ -51,19 +51,31 @@ public:
 	void SetDisplayName(const FString& InName) { DisplayName = InName; }
 
 	/** Last position this enemy actually saw the player at */
-	FVector GetLastKnownPlayerLocation() const { return LastKnownPlayerLocation; }
+	FVector GetLastKnownTargetLocation() const { return LastKnownTargetLocation; }
 
 	/** The player this enemy is tracking, if any */
-	AActor* GetPlayerTarget() const { return PlayerTarget; }
+	AActor* GetCurrentTarget() const { return CurrentTarget; }
 
 	/** True while this enemy is fighting rather than idling or searching */
 	bool IsInCombat() const;
+
+	//~Begin ICQBFactionAgent
+	virtual ECQBFaction GetFaction() const override { return Faction; }
+	//~End ICQBFactionAgent
 
 	/** A squad mate said something. Idle enemies move to investigate a contact. */
 	void OnCalloutReceived(ECalloutType Callout, AEnemyAIController* From);
 
 	/** The squad dropped every role, so ask for a new one */
 	void OnSquadRolesInvalidated();
+
+public:
+
+	/** Issues a move order and remembers the goal for the arrival test */
+	void MoveToPoint(const FVector& Goal);
+
+	/** True once the pawn is close enough to the goal, or the path following gave up */
+	bool HasReachedGoal(float Tolerance = 140.0f) const;
 
 protected:
 
@@ -74,13 +86,13 @@ protected:
 	//~ State machine
 
 	/** Dispatches to the per state Enter function */
-	void EnterState(EEnemyState State);
+	virtual void EnterState(ECQBAIState State);
 
 	/** Dispatches to the per state Update function */
-	void UpdateState(EEnemyState State, float DeltaTime);
+	virtual void UpdateState(ECQBAIState State, float DeltaTime);
 
 	/** Dispatches to the per state Exit function */
-	void ExitState(EEnemyState State);
+	virtual void ExitState(ECQBAIState State);
 
 	void EnterIdle();
 	void UpdateIdle(float DeltaTime);
@@ -107,15 +119,18 @@ protected:
 	void ExitSuppress();
 
 	/** Transitions that apply no matter which state is running, such as losing the player */
-	void UpdateGlobalTransitions(float DeltaTime);
+	virtual void UpdateGlobalTransitions(float DeltaTime);
 
 	//~ Perception
 
 	UFUNCTION()
 	void OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
-	/** True when the actor is the pawn of a player controller */
-	bool IsPlayerActor(const AActor* Actor) const;
+	/** True when the actor belongs to a faction this one shoots at */
+	bool IsHostile(const AActor* Actor) const;
+
+	/** Squad members register with ASquadManager; the player's own squad does not */
+	virtual bool ShouldJoinSquad() const { return true; }
 
 	/** Refreshes bHasLineOfSight and the last known location */
 	void UpdateSenses(float DeltaTime);
@@ -125,14 +140,8 @@ protected:
 	/** Starts or stops the weapon trigger */
 	void SetFiring(bool bFire);
 
-	/** Faces the player while fighting, faces the movement direction otherwise */
+	/** Faces the target while fighting, faces the movement direction otherwise */
 	void SetFacePlayerMode(bool bFacePlayer);
-
-	/** Issues a move order and remembers the goal for the arrival test */
-	void MoveToPoint(const FVector& Goal);
-
-	/** True once the pawn is close enough to the goal, or the path following gave up */
-	bool HasReachedGoal(float Tolerance = 140.0f) const;
 
 	/** Re-issues a move order that could not be pathed, while the navmesh finishes generating */
 	void RetryFailedMove(float DeltaTime);
@@ -228,13 +237,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Combat")
 	int32 MaxMoveRetries = 12;
 
+	/** Side this controller fights for */
+	UPROPERTY(EditDefaultsOnly, Category = "AI")
+	ECQBFaction Faction = ECQBFaction::Enemy;
+
 	/** Draw the state name over the pawn */
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Debug")
 	bool bDrawStateDebug = true;
 
 	//~ Runtime state
 
-	EEnemyState CurrentState = EEnemyState::Idle;
+	ECQBAIState CurrentState = ECQBAIState::Idle;
 
 	ESquadRole SquadRole = ESquadRole::None;
 
@@ -242,9 +255,9 @@ protected:
 
 	/** The player pawn, once perceived */
 	UPROPERTY()
-	TObjectPtr<AActor> PlayerTarget;
+	TObjectPtr<AActor> CurrentTarget;
 
-	FVector LastKnownPlayerLocation = FVector::ZeroVector;
+	FVector LastKnownTargetLocation = FVector::ZeroVector;
 
 	/** Where the last sight or hearing stimulus came from */
 	FVector LastStimulusLocation = FVector::ZeroVector;

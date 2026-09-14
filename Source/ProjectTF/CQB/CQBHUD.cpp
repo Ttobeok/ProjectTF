@@ -8,6 +8,8 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "EnemyCharacter.h"
+#include "DoorwayMarker.h"
+#include "ProjectTFCharacter.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
 #include "ProjectTF.h"
@@ -66,6 +68,7 @@ void ACQBHUD::DrawHUD()
 
 	DrawCrosshair(Weapon);
 	DrawReadout(Weapon, Health);
+	DrawSquadBar();
 }
 
 void ACQBHUD::DrawCrosshair(const UWeaponComponent* Weapon)
@@ -133,6 +136,42 @@ void ACQBHUD::DrawReadout(const UWeaponComponent* Weapon, const UHealthComponent
 	}
 }
 
+
+void ACQBHUD::DrawSquadBar()
+{
+	UFont* Font = GEngine ? GEngine->GetLargeFont() : nullptr;
+	const AProjectTFCharacter* Player = Cast<AProjectTFCharacter>(GetOwningPawn());
+	if (!Font || !Player)
+	{
+		return;
+	}
+
+	const float CentreX = Canvas->SizeX * 0.5f;
+
+	// what the squad is doing right now
+	const FString Orders = Player->GetSquadOrderSummary();
+	if (!Orders.IsEmpty())
+	{
+		const float Width = Orders.Len() * 8.0f;
+		DrawText(Orders, FLinearColor(0.7f, 0.85f, 1.0f), CentreX - Width * 0.5f, Canvas->SizeY - 110.0f, Font, 1.0f);
+	}
+
+	// aiming at a doorway turns 1 and 2 into orders about it
+	if (const ADoorwayMarker* Doorway = Player->GetAimedDoorway())
+	{
+		const FString Hint = FString::Printf(TEXT("%s    [1] Stack    [2] Clear"), *Doorway->GetDisplayName());
+		const float Width = Hint.Len() * 11.0f;
+
+		DrawText(Hint, FLinearColor(1.0f, 0.9f, 0.4f), CentreX - Width * 0.5f, Canvas->SizeY - 145.0f, Font, 1.15f);
+	}
+	else
+	{
+		const FString Hint(TEXT("[Z] Follow    [H] Hold    aim a doorway for Stack / Clear"));
+		const float Width = Hint.Len() * 7.0f;
+
+		DrawText(Hint, FLinearColor(0.55f, 0.55f, 0.6f), CentreX - Width * 0.5f, Canvas->SizeY - 145.0f, Font, 0.85f);
+	}
+}
 
 //~ Debug console commands ----------------------------------------------------
 
