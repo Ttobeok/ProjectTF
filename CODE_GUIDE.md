@@ -155,3 +155,159 @@ ProjectTF.exe -game -windowed -CQBScreenshotAfter=5
 ```
 
 로그에서 `CQB:` 로 시작하는 줄만 보면 AI 동작이 전부 추적됩니다.
+
+---
+
+## 7. 구조 정리 — 무엇이 어디에 있나
+
+4개 층으로 나뉩니다. 위로 갈수록 자주 바뀌고, 바꾸는 비용이 쌉니다.
+
+```
+┌─ Config (.ini)          프로젝트 전역. 재시작 필요
+│   DefaultEngine.ini        기본 맵, NavMesh 인보커 설정
+│   DefaultGame.ini          패키징 설정
+│
+├─ Level (Lvl_CQB)         배치. 에디터에서 즉시
+│   EnemySpawner             적 수·위치, 스폰할 적 클래스
+│   PlayerStart / 조명 / 지오메트리
+│   (SquadManager)           없으면 런타임 자동 생성
+│
+├─ Data Asset              수치 묶음. 재컴파일 없음
+│   UWeaponData              무기 한 벌의 모든 수치
+│
+└─ C++ (Source/ProjectTF)  규칙·상태머신·시스템
+    CQB/*.h 의 UPROPERTY     기본값. BP로 덮어쓸 수 있음
+    CQB/*.cpp                전이 조건, 배분 규칙 — 여기만 진짜 "로직"
+```
+
+**핵심 원칙:** C++는 *규칙*, 그 위는 전부 *수치와 배치*입니다.
+"적이 3초 뒤 포기한다"는 규칙은 C++, "3초"라는 값은 데이터입니다.
+
+---
+
+## 8. 데이터 수정 — 무엇을 바꾸려면 어디로
+
+### 한눈에
+
+| 바꾸고 싶은 것 | 어디서 | 재컴파일 | 적용 범위 |
+|---|---|---|---|
+| 무기 수치 (데미지·연사·반동·FOV) | `UWeaponData` 에셋 | 없음 | 그 에셋을 쓰는 무기 전부 |
+| 적 체력·무기·래그돌 | `BP_Enemy` (AEnemyCharacter 상속) | 없음 | 그 BP로 스폰된 적 |
+| AI 인지·전투 타이밍 | `BP_EnemyAIController` | 없음 | 그 컨트롤러를 쓰는 적 |
+| 분대 측면거리·콜아웃 시간 | 레벨에 배치한 `SquadManager` | 없음 | 그 레벨 |
+| 적 수·배치 위치 | 레벨의 `EnemySpawner` | 없음 | 그 레벨 |
+| 레벨 형태 (방 크기·복도·엄폐물) | `Scripts/BuildCQBLevel.py` | 없음 | 레벨 재생성 |
+| 전이 규칙·역할 배분 로직 | `CQB/*.cpp` | **필요** | 전역 |
+| 기본값 자체 | `CQB/*.h` | **필요** | 전역 |
+
+### 1) 무기 수치 — Data Asset
+
+```
+Content Browser 우클릭 → Miscellaneous → Data Asset → WeaponData 선택
+  → DA_Rifle_Player 생성, 값 입력
+  → BP_FirstPersonCharacter 열기 → Weapon Component 선택
+  → Weapon Data = DA_Rifle_Player
+```
+
+에셋을 안 물리면 `UWeaponComponent::GetWeaponData()`가 런타임 기본값을 만들어 씁니다.
+그래서 에셋 없이도 동작하고, 물리면 그쪽이 이깁니다.
+
+적 무기는 `AEnemyCharacter::BeginPlay()`가 `EnemyWeaponDamage` 등으로 런타임 생성하는데,
+BP에서 `Weapon Data`를 물리면 그게 우선입니다.
+
+| 필드 | 기본 | 의미 |
+|---|---|---|
+| `Damage` | 20 | 1발 데미지 |
+| `FireRate` | 8 | 초당 발사 수. 간격 = 1/FireRate |
+| `MagSize` / `ReloadTime` | 30 / 1.8s | 탄창 / 재장전 |
+| `RecoilPitchMin/Max` | 0.25~0.7 | 발당 상승 각도 |
+| `RecoilYawMin/Max` | ±0.25 | 발당 좌우 흔들림 |
+| `RecoilRecoverySpeed` | 6 °/s | 미발사 시 복구 속도 |
+| `ADSFov` / `HipFov` | 55 / 90 | 조준 / 평상시 시야각 |
+| `NoiseLoudness` / `NoiseRange` | 2 / 4000 | AI 청각에 전달되는 총성 |
+
+### 2) 적 — BP 껍데기 2개
+
+지금은 적이 C++ 클래스로 직접 스폰돼 만질 디테일 패널이 없습니다. 한 번만 만들어두면 됩니다:
+
+```
+1) Blueprint Class → AEnemyAIController 검색 → BP_EnemyAIController
+     AI|Perception   SightRadius, SightAngle, HearingRange
+     AI|Combat       LoseSightGraceTime, InvestigateGiveUpTime, EngageMinDuration,
+                     SuppressFireDuration, SuppressRestDuration,
+                     CoverSearchRadius, MinCoverDistanceFromPlayer,
+                     MoveRetryInterval, MaxMoveRetries, CoverQuery
+     AI|Debug        bDrawStateDebug
+
+2) Blueprint Class → AEnemyCharacter 검색 → BP_Enemy
+     Class Defaults → AI Controller Class = BP_EnemyAIController
+     Enemy          EnemyMaxHealth, bRagdollOnDeath, DeferredDestructionTime
+     Enemy|Weapon   EnemyWeaponDamage, EnemyWeaponFireRate, EnemyAimSpreadHalfAngle
+
+3) 레벨의 EnemySpawner 선택 → Enemy Class = BP_Enemy
+```
+
+적 성격을 여러 개 만들려면 BP_Enemy를 복제해서 값만 바꾸고, 스포너를 여러 개 두면 됩니다.
+
+### 3) 분대 — 레벨에 직접 배치해야 함
+
+`ASquadManager`는 월드에 없으면 **런타임에 자동 생성**됩니다. 편하지만, 그러면 값을 못 만집니다.
+`FlankDistance`나 `CalloutDisplayTime`을 바꾸려면:
+
+```
+Place Actors에서 SquadManager 검색 → 레벨에 배치 → 디테일 패널에서 조정
+```
+
+레벨에 하나라도 있으면 `GetSquadManager()`가 그걸 씁니다 (자동 생성 안 함).
+
+### 4) 적 배치 — EnemySpawner
+
+```
+Spawner
+  EnemyClass         스폰할 적 클래스 (기본 AEnemyCharacter)
+  SpawnOffsets       스포너 기준 상대 좌표 배열. 항목 수 = 적 수
+  bSpawnOnBeginPlay  체크 해제하면 BP에서 SpawnEnemies() 직접 호출
+```
+
+각 지점은 NavMesh에 투영된 뒤 캡슐 높이만큼 올려 스폰합니다.
+
+### 5) 레벨 형태 — Python 스크립트
+
+방 크기·복도 폭·엄폐물 위치는 `Scripts/BuildCQBLevel.py` 상단 상수와
+`build_geometry()` / `build_cover()` 좌표입니다.
+
+```bash
+UnrealEditor-Cmd.exe ProjectTF.uproject -run=pythonscript -script="Scripts/BuildCQBLevel.py"
+```
+
+레벨을 통째로 다시 만듭니다. **에디터에서 손으로 고친 건 날아갑니다.**
+손으로 다듬기 시작했으면 스크립트는 그만 돌리거나, 변경분을 스크립트에 반영하세요.
+
+### 6) 프로젝트 설정 — ini
+
+| 파일 | 무엇 |
+|---|---|
+| `DefaultEngine.ini` | 시작 맵, `bGenerateNavigationOnlyAroundNavigationInvokers`, RecastNavMesh 설정 |
+| `DefaultGame.ini` | 패키징 (쿡할 맵, pak 압축) |
+
+---
+
+## 9. 아직 안 열어둔 것
+
+솔직히 적어둡니다. **BP 확장 훅이 없습니다** (`BlueprintImplementableEvent` 0개).
+수치는 전부 뺐지만, 연출을 붙일 자리는 안 만들어뒀습니다.
+
+붙이면 좋을 지점:
+
+| 훅 | 쓸 곳 |
+|---|---|
+| `OnStateChanged(Old, New)` | 상태별 사운드·애님 몽타주 |
+| `OnCalloutSpoken(Callout)` | 콜아웃 음성 |
+| `OnWeaponFired()` | 머즐 플래시·탄피·사운드 |
+| `OnEnemyDied()` | 사망 연출 |
+
+그리고 **적 프로파일 DataAsset**도 아직 없습니다. 지금은 AI 수치 12개가
+`AEnemyAIController`에 흩어져 있어서, 적 성격을 바꾸려면 BP를 복제해야 합니다.
+`UEnemyProfileData` 하나로 묶으면 에셋만 갈아끼우면 됩니다.
+
+둘 다 로직 변경이 아니라 **표면을 넓히는 작업**이라, 필요해질 때 해도 늦지 않습니다.
