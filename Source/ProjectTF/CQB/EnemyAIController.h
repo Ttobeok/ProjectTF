@@ -22,6 +22,13 @@ struct FEnvQueryResult;
  *  Perception feeds a plain C++ state machine: every state has Enter / Update / Exit,
  *  Tick runs the Update of the current state and SetState() drives transitions.
  *  Squad level decisions (who suppresses, who flanks, where to flank) come from ASquadManager.
+ *
+ *  The implementation is split across four files, by role rather than by size:
+ *
+ *    EnemyAIController.cpp          the machine - senses, Tick, transitions, dispatch
+ *    EnemyAIController_States.cpp   the states  - one Enter/Update/Exit trio each
+ *    EnemyAIController_Actions.cpp  the verbs   - firing, facing, moving, finding cover
+ *    EnemyAIController_Squad.cpp    the talking - callouts, role reassignment, surrender
  */
 UCLASS()
 class PROJECTTF_API AEnemyAIController : public AAIController, public ICQBFactionAgent

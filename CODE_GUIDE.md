@@ -24,7 +24,7 @@
 | 11 | `SquadManager.cpp` | 222 | 적 분대의 역할 배분·콜아웃 |
 
 `AEnemyAIController`는 파일 4개로 나뉘어 있습니다. 클래스는 하나고, 경계는 역할별입니다:
-**머신 본체 / 상태 / 동작 / 분대**. 상태 하나를 고치러 왔다면 `_States.cpp`만 열면 됩니다.
+**머신 본체 / 상태 / 동작 / 분대**. 상태 하나를 고치러 왔다면 `EnemyAIController_States.cpp`만 열면 됩니다.
 
 ---
 
@@ -267,7 +267,7 @@ GetClearPoint()             문 너머 450cm
 |---|---|
 | `ProjectTFCharacter.h/.cpp` | Health/Weapon/WeaponVisual/NavInvoker 컴포넌트, Fire·ADS·Reload·Lean 입력, 분대 명령 입력, 진영·시야타깃 인터페이스 |
 | `ProjectTFCameraManager.cpp` | `UpdateViewTarget()`에서 린(roll + 측면 오프셋)을 최종 POV에 적용 |
-| `ProjectTFPlayerController.cpp` | `BeginPlay`에서 `ClientSetHUD(ACQBHUD)`, 팀 ID |
+| `ProjectTFPlayerController.h/.cpp` | `BeginPlay`에서 `ClientSetHUD(ACQBHUD)`, 팀 ID |
 
 `Variant_Shooter` / `Variant_Horror`는 **최초 상태 그대로**입니다 (git diff로 확인 가능).
 
