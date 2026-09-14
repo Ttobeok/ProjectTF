@@ -172,6 +172,9 @@ public:
 	/** Returns the third person anim instance class */
 	const TSubclassOf<UAnimInstance>& GetThirdPersonAnimInstanceClass() const;
 
+	/** Returns the montage played when this weapon fires */
+	UAnimMontage* GetFiringMontage() const { return FiringMontage; }
+
 	/** Returns the magazine size */
 	int32 GetMagazineSize() const { return MagazineSize; };
 

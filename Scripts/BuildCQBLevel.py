@@ -75,7 +75,7 @@ def solid_spans(span_min, span_max, holes):
     return spans
 
 
-def build_region(prefix, min_x, max_x, min_y, max_y, walls, floor=True, floor_drop=0.0):
+def build_region(prefix, min_x, max_x, min_y, max_y, walls, floor=True, floor_drop=0.0, ceiling=True):
     """
     Floor slab plus the requested walls for one rectangular region.
 
@@ -92,6 +92,13 @@ def build_region(prefix, min_x, max_x, min_y, max_y, walls, floor=True, floor_dr
     if floor:
         spawn_box(prefix + "_Floor",
                   (min_x + max_x) * 0.5, (min_y + max_y) * 0.5, -FLOOR_THICKNESS * 0.5 - floor_drop,
+                  (max_x - min_x) + t * 2, (max_y - min_y) + t * 2, FLOOR_THICKNESS)
+
+    if ceiling:
+        # Rooms read as interiors rather than open pits, and it keeps the AI debug text from
+        # being lost against the sky. Sits just above the walls.
+        spawn_box(prefix + "_Ceiling",
+                  (min_x + max_x) * 0.5, (min_y + max_y) * 0.5, WALL_HEIGHT + FLOOR_THICKNESS * 0.5 + floor_drop,
                   (max_x - min_x) + t * 2, (max_y - min_y) + t * 2, FLOOR_THICKNESS)
 
     for side, holes in walls.items():
@@ -183,6 +190,37 @@ def setup_light(actor, label, component_class, intensity):
 
     component.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
     component.set_editor_property("intensity", intensity)
+
+
+def spawn_room_light(name, x, y, intensity=5000.0, radius=1400.0):
+    """Ceilings block the sun, so each space gets its own lamp."""
+    light = editor_actor.spawn_actor_from_class(
+        unreal.PointLight, unreal.Vector(x, y, WALL_HEIGHT - 60.0), unreal.Rotator(0, 0, 0))
+    if light is None:
+        return None
+
+    light.set_actor_label(name)
+
+    component = light.get_component_by_class(unreal.PointLightComponent)
+    if component:
+        component.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
+        component.set_editor_property("intensity", intensity)
+        component.set_editor_property("attenuation_radius", radius)
+        component.set_editor_property("cast_shadows", False)
+
+    return light
+
+
+def build_interior_lights():
+    spawn_room_light("Light_RoomA_1", -550.0, 150.0)
+    spawn_room_light("Light_RoomA_2", -200.0, -200.0)
+    spawn_room_light("Light_RoomB_1", 400.0, 150.0)
+    spawn_room_light("Light_RoomB_2", 800.0, -150.0)
+    spawn_room_light("Light_Spawn", -1200.0, -250.0, 3000.0, 900.0)
+    spawn_room_light("Light_Entry", -900.0, -250.0, 2500.0, 700.0)
+    spawn_room_light("Light_Door", 100.0, 250.0, 2500.0, 700.0)
+    spawn_room_light("Light_Flank_1", -300.0, -600.0, 3500.0, 1100.0)
+    spawn_room_light("Light_Flank_2", 500.0, -600.0, 3500.0, 1100.0)
 
 
 def build_lighting():
@@ -289,6 +327,11 @@ def main():
     build_geometry()
     build_cover()
     build_gameplay_actors()
+
+    try:
+        build_interior_lights()
+    except Exception as error:
+        unreal.log_error("interior lights failed: " + str(error))
 
     try:
         build_lighting()

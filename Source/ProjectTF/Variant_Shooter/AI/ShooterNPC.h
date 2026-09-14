@@ -17,7 +17,9 @@ class AShooterWeapon;
  *  Holds and manages a weapon
  */
 UCLASS(abstract)
-class PROJECTTF_API AShooterNPC : public AProjectTFCharacter, public IShooterWeaponHolder
+// the weapon holder interface is inherited from AProjectTFCharacter, which implements the
+// visual half of it for the CQB sample
+class PROJECTTF_API AShooterNPC : public AProjectTFCharacter
 {
 	GENERATED_BODY()
 

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "Variant_Shooter/Weapons/ShooterWeaponHolder.h"
 #include "ProjectTFCharacter.generated.h"
 
 class UInputComponent;
@@ -13,7 +14,8 @@ class UCameraComponent;
 class UInputAction;
 class UHealthComponent;
 class UWeaponComponent;
-class UStaticMeshComponent;
+class UAnimInstance;
+class AShooterWeapon;
 class UNavigationInvokerComponent;
 struct FInputActionValue;
 
@@ -24,7 +26,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
  *  Carries the CQB health and hitscan weapon components and handles fire / ADS / reload / lean input.
  */
 UCLASS(abstract)
-class AProjectTFCharacter : public ACharacter
+class AProjectTFCharacter : public ACharacter, public IShooterWeaponHolder
 {
 	GENERATED_BODY()
 
@@ -43,10 +45,6 @@ class AProjectTFCharacter : public ACharacter
 	/** Hitscan weapon shared with the AI enemies */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UWeaponComponent* WeaponComponent;
-
-	/** Visible weapon, attached to the first person hands */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	UStaticMeshComponent* WeaponMesh;
 
 	/** Keeps navmesh tiles generated around this character at runtime */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
@@ -89,6 +87,45 @@ protected:
 	/** Lean right Input Action. Optional: E is bound directly when this is empty. */
 	UPROPERTY(EditAnywhere, Category ="Input|CQB")
 	UInputAction* CQBLeanRightAction;
+
+	/**
+	 *  Weapon actor used for the visuals: meshes, hand poses and the firing montage.
+	 *  The gameplay lives in UWeaponComponent; this only supplies what the player sees.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category="Weapon Visual")
+	TSubclassOf<AShooterWeapon> WeaponVisualClass;
+
+	/** Loaded on BeginPlay when no class is set. Never load this from the constructor. */
+	UPROPERTY(EditDefaultsOnly, Category="Weapon Visual")
+	TSoftClassPtr<AShooterWeapon> WeaponVisualAsset = TSoftClassPtr<AShooterWeapon>(FSoftObjectPath(TEXT("/Game/Variant_Shooter/Blueprints/Pickups/Weapons/BP_ShooterWeapon_Rifle.BP_ShooterWeapon_Rifle_C")));
+
+	/** Socket the third person weapon mesh attaches to */
+	UPROPERTY(EditDefaultsOnly, Category="Weapon Visual")
+	FName WeaponSocket = FName("HandGrip_R");
+
+	/** Where the weapon sits relative to the camera */
+	UPROPERTY(EditDefaultsOnly, Category="Weapon Visual")
+	FVector WeaponViewOffset = FVector(42.0f, 13.0f, -16.0f);
+
+	UPROPERTY(EditDefaultsOnly, Category="Weapon Visual")
+	// the weapon mesh is authored for a hand socket, so its muzzle needs turning to face forward
+	FRotator WeaponViewRotation = FRotator(0.0f, 90.0f, 0.0f);
+
+	/** How far the weapon is shoved back on each shot, in cm */
+	UPROPERTY(EditDefaultsOnly, Category="Weapon Visual")
+	float FireKickDistance = 5.0f;
+
+	/** How far the muzzle rises on each shot, in degrees */
+	UPROPERTY(EditDefaultsOnly, Category="Weapon Visual")
+	float FireKickPitch = 6.0f;
+
+	/** How fast the weapon settles back after a shot */
+	UPROPERTY(EditDefaultsOnly, Category="Weapon Visual")
+	float FireKickRecoverySpeed = 9.0f;
+
+	/** Spawned weapon actor */
+	UPROPERTY(Transient)
+	TObjectPtr<AShooterWeapon> WeaponVisual;
 
 	/** Camera roll applied at full lean, in degrees */
 	UPROPERTY(EditAnywhere, Category ="Lean")
@@ -185,6 +222,13 @@ protected:
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 
+	/** Called on every shot so the weapon can be kicked back */
+	UFUNCTION()
+	void OnWeaponAmmoChanged(int32 CurrentAmmo, int32 MagSize);
+
+	/** Current amount of fire kick left, 0 to 1 */
+	float FireKickAlpha = 0.0f;
+
 	/** Where the lean is heading: -1, 0 or 1 */
 	float LeanTarget = 0.0f;
 
@@ -202,7 +246,17 @@ public:
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
-	/** Returns the visible weapon mesh **/
-	UStaticMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
+	//~Begin IShooterWeaponHolder interface. Only the visual half is used; the firing logic,
+	//~ammo and recoil all live in UWeaponComponent.
+	virtual void AttachWeaponMeshes(AShooterWeapon* Weapon) override;
+	virtual void PlayFiringMontage(UAnimMontage* Montage) override;
+	virtual void AddWeaponRecoil(float Recoil) override;
+	virtual void UpdateWeaponHUD(int32 CurrentAmmo, int32 MagazineSize) override;
+	virtual FVector GetWeaponTargetLocation() override;
+	virtual void AddWeaponClass(const TSubclassOf<AShooterWeapon>& WeaponClass) override;
+	virtual void OnWeaponActivated(AShooterWeapon* Weapon) override;
+	virtual void OnWeaponDeactivated(AShooterWeapon* Weapon) override;
+	virtual void OnSemiWeaponRefire() override;
+	//~End IShooterWeaponHolder interface
 
 };

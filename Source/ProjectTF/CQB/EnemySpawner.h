@@ -45,10 +45,14 @@ protected:
 	/** Rebuilds the navmesh at startup when the level carries an empty one */
 	void EnsureNavigationBuilt();
 
-	/** Debug helper driven by the cqb.KillEnemyAfter console variable */
+	/** Debug helper driven by -CQBKillEnemyAfter=<seconds> */
 	void DebugKillOneEnemy();
 
+	/** Debug helper driven by -CQBScreenshotAfter=<seconds>, used to eyeball the HUD and weapons */
+	void DebugTakeScreenshot();
+
 	FTimerHandle DebugKillTimerHandle;
+	FTimerHandle DebugScreenshotTimerHandle;
 
 	/** Editor only arrow so the spawner can be found in the viewport */
 	UPROPERTY(VisibleAnywhere, Category = "Spawner")

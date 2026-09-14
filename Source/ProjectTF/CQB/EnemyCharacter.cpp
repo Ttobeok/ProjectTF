@@ -7,7 +7,7 @@
 #include "EnemyAIController.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Components/StaticMeshComponent.h"
+#include "Variant_Shooter/Weapons/ShooterWeapon.h"
 #include "NavigationInvokerComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -31,29 +31,7 @@ AEnemyCharacter::AEnemyCharacter()
 		GetMesh()->SetSkeletalMesh(MeshAsset.Object);
 	}
 
-	// rifle pose rather than empty hands, so the enemies read as armed at a glance
-	static ConstructorHelpers::FClassFinder<UAnimInstance> AnimAsset(TEXT("/Game/Variant_Shooter/Anims/ABP_TP_Rifle"));
-	if (AnimAsset.Succeeded())
-	{
-		GetMesh()->SetAnimInstanceClass(AnimAsset.Class);
-	}
-
 	GetMesh()->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, -96.0f), FRotator(0.0f, -90.0f, 0.0f));
-
-	// weapon in the right hand, matching the socket the template animations grip with
-	WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Weapon Mesh"));
-	WeaponMesh->SetupAttachment(GetMesh(), FName("HandGrip_R"));
-	WeaponMesh->SetCollisionProfileName(FName("NoCollision"));
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> RifleMesh(TEXT("/Game/Weapons/Rifle/Meshes/SM_Rifle.SM_Rifle"));
-	if (RifleMesh.Succeeded())
-	{
-		WeaponMesh->SetStaticMesh(RifleMesh.Object);
-	}
-
-	// navmesh tiles are generated around invokers, which is what keeps the AI able to path
-	NavigationInvoker = CreateDefaultSubobject<UNavigationInvokerComponent>(TEXT("Navigation Invoker"));
-	NavigationInvoker->SetGenerationRadii(5000.0f, 7000.0f);
 
 	// gameplay components, the same ones the player uses
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("Health Component"));
@@ -103,6 +81,19 @@ void AEnemyCharacter::BeginPlay()
 	}
 
 	Super::BeginPlay();
+
+	// Resolved here, never in the constructor: loading this blueprint during class default
+	// object construction deadlocks the async loader.
+	if (!WeaponVisualClass)
+	{
+		WeaponVisualClass = WeaponVisualAsset.LoadSynchronous();
+	}
+
+	// spawning the weapon also applies the rifle body pose, through OnWeaponActivated
+	if (WeaponVisualClass)
+	{
+		AddWeaponClass(WeaponVisualClass);
+	}
 }
 
 void AEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -134,12 +125,6 @@ void AEnemyCharacter::OnEnemyDeath(AActor* DeadActor, AActor* Killer)
 	GetCharacterMovement()->DisableMovement();
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// let the weapon drop with the body
-	if (WeaponMesh)
-	{
-		WeaponMesh->SetVisibility(bRagdollOnDeath);
-	}
-
 	if (bRagdollOnDeath)
 	{
 		GetMesh()->SetCollisionProfileName(FName("Ragdoll"));
@@ -168,4 +153,78 @@ void AEnemyCharacter::OnEnemyDeath(AActor* DeadActor, AActor* Killer)
 void AEnemyCharacter::DeferredDestroy()
 {
 	Destroy();
+}
+
+
+//~ IShooterWeaponHolder ------------------------------------------------------
+
+void AEnemyCharacter::AttachWeaponMeshes(AShooterWeapon* Weapon)
+{
+	const FAttachmentTransformRules AttachmentRule(EAttachmentRule::SnapToTarget, false);
+
+	Weapon->AttachToActor(this, AttachmentRule);
+
+	// enemies are only ever seen from the outside, so the third person mesh is the one that matters
+	Weapon->GetThirdPersonMesh()->AttachToComponent(GetMesh(), AttachmentRule, WeaponSocket);
+	Weapon->GetFirstPersonMesh()->SetVisibility(false);
+}
+
+void AEnemyCharacter::PlayFiringMontage(UAnimMontage* Montage)
+{
+	if (!Montage)
+	{
+		return;
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		AnimInstance->Montage_Play(Montage);
+	}
+}
+
+void AEnemyCharacter::AddWeaponRecoil(float Recoil)
+{
+}
+
+void AEnemyCharacter::UpdateWeaponHUD(int32 CurrentAmmo, int32 MagazineSize)
+{
+}
+
+FVector AEnemyCharacter::GetWeaponTargetLocation()
+{
+	return GetPawnViewLocation() + GetBaseAimRotation().Vector() * 10000.0f;
+}
+
+void AEnemyCharacter::AddWeaponClass(const TSubclassOf<AShooterWeapon>& WeaponClass)
+{
+	if (!WeaponClass || WeaponVisual)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParams.TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot;
+
+	WeaponVisual = GetWorld()->SpawnActor<AShooterWeapon>(WeaponClass, GetActorTransform(), SpawnParams);
+
+	if (WeaponVisual)
+	{
+		WeaponVisual->ActivateWeapon(FName("Enemy"));
+	}
+}
+
+void AEnemyCharacter::OnWeaponActivated(AShooterWeapon* Weapon)
+{
+	GetMesh()->SetAnimInstanceClass(Weapon->GetThirdPersonAnimInstanceClass());
+}
+
+void AEnemyCharacter::OnWeaponDeactivated(AShooterWeapon* Weapon)
+{
+}
+
+void AEnemyCharacter::OnSemiWeaponRefire()
+{
 }

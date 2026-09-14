@@ -11,6 +11,7 @@
 #include "TimerManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "UnrealClient.h"
 #include "ProjectTF.h"
 
 AEnemySpawner::AEnemySpawner()
@@ -51,6 +52,23 @@ void AEnemySpawner::BeginPlay()
 		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing one enemy in %.1fs"), KillAfter);
 		GetWorld()->GetTimerManager().SetTimer(DebugKillTimerHandle, this, &AEnemySpawner::DebugKillOneEnemy, KillAfter, false);
 	}
+
+	// Screenshot hook, for checking the crosshair and the weapons without sitting at the machine:
+	//   ProjectTF.exe -CQBScreenshotAfter=5
+	float ScreenshotAfter = 0.0f;
+	FParse::Value(FCommandLine::Get(), TEXT("CQBScreenshotAfter="), ScreenshotAfter);
+
+	if (ScreenshotAfter > 0.0f)
+	{
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: screenshot in %.1fs"), ScreenshotAfter);
+		GetWorld()->GetTimerManager().SetTimer(DebugScreenshotTimerHandle, this, &AEnemySpawner::DebugTakeScreenshot, ScreenshotAfter, false);
+	}
+}
+
+void AEnemySpawner::DebugTakeScreenshot()
+{
+	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: taking a screenshot"));
+	FScreenshotRequest::RequestScreenshot(false);
 }
 
 void AEnemySpawner::EnsureNavigationBuilt()
