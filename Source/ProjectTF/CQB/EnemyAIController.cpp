@@ -3,6 +3,7 @@
 #include "EnemyAIController.h"
 #include "CQBTypes.h"
 #include "EnemyCharacter.h"
+#include "EngineUtils.h"
 #include "SquadManager.h"
 #include "WeaponComponent.h"
 #include "HealthComponent.h"
@@ -131,6 +132,15 @@ FGenericTeamId AEnemyAIController::GetGenericTeamId() const
 
 bool AEnemyAIController::IsHostile(const AActor* Actor) const
 {
+	// hands up means out of the fight; the squad stops shooting at them
+	if (const AEnemyCharacter* AsCharacter = Cast<const AEnemyCharacter>(Actor))
+	{
+		if (AsCharacter->IsSurrendered())
+		{
+			return false;
+		}
+	}
+
 	// a corpse is not a threat
 	if (const UHealthComponent* Health = UHealthComponent::FindHealthComponent(const_cast<AActor*>(Actor)))
 	{
@@ -256,6 +266,12 @@ void AEnemyAIController::Tick(float DeltaTime)
 
 void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 {
+	// giving up is final for the rest of the encounter
+	if (CurrentState == ECQBAIState::Surrender)
+	{
+		return;
+	}
+
 	// a dead target ends the fight
 	if (CurrentTarget)
 	{
@@ -332,6 +348,7 @@ void AEnemyAIController::EnterState(ECQBAIState State)
 	case ECQBAIState::Cover:		EnterCover(); break;
 	case ECQBAIState::Flank:		EnterFlank(); break;
 	case ECQBAIState::Suppress:		EnterSuppress(); break;
+	case ECQBAIState::Surrender:	EnterSurrender(); break;
 	}
 }
 
@@ -345,6 +362,7 @@ void AEnemyAIController::UpdateState(ECQBAIState State, float DeltaTime)
 	case ECQBAIState::Cover:		UpdateCover(DeltaTime); break;
 	case ECQBAIState::Flank:		UpdateFlank(DeltaTime); break;
 	case ECQBAIState::Suppress:		UpdateSuppress(DeltaTime); break;
+	case ECQBAIState::Surrender:	UpdateSurrender(DeltaTime); break;
 	}
 }
 
@@ -885,4 +903,138 @@ void AEnemyAIController::DrawStateDebug(float DeltaTime) const
 	const FColor Color = IsInCombat() ? FColor::Red : (CurrentState == ECQBAIState::Investigate ? FColor::Yellow : FColor::White);
 
 	DrawDebugString(GetWorld(), MyPawn->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), Text, nullptr, Color, 0.0f, true);
+}
+
+
+//~ Compliance -----------------------------------------------------------------
+
+float AEnemyAIController::EvaluateCompliance(const AActor* Challenger) const
+{
+	const APawn* MyPawn = GetPawn();
+	if (!MyPawn || !Challenger)
+	{
+		return 0.0f;
+	}
+
+	float Pressure = 0.0f;
+
+	// being hurt is the biggest single reason to stop
+	if (const UHealthComponent* Health = GetHealth())
+	{
+		const float Percent = Health->GetHealthPercent();
+		if (Percent < ComplianceHealthThreshold)
+		{
+			Pressure += (ComplianceHealthThreshold - Percent) / ComplianceHealthThreshold;
+		}
+	}
+
+	// someone shouting in your face is more convincing than someone across the building
+	const float Distance = FVector::Dist(MyPawn->GetActorLocation(), Challenger->GetActorLocation());
+	if (Distance < ComplianceRange)
+	{
+		Pressure += 0.5f * (1.0f - Distance / ComplianceRange);
+	}
+
+	// being alone is worse than having the squad around
+	int32 StandingMates = 0;
+	for (TActorIterator<AEnemyCharacter> It(GetWorld()); It; ++It)
+	{
+		const AEnemyCharacter* Other = *It;
+		if (Other && Other != MyPawn && !Other->IsDead() && !Other->IsSurrendered()
+			&& FCQBFactions::GetFaction(Other) == Faction)
+		{
+			++StandingMates;
+		}
+	}
+
+	if (StandingMates == 0)
+	{
+		Pressure += 0.4f;
+	}
+
+	// caught out of cover with a weapon pointed at you
+	if (!bHasLineOfSight)
+	{
+		Pressure -= 0.3f;
+	}
+
+	return FMath::Max(0.0f, Pressure);
+}
+
+bool AEnemyAIController::ReceiveChallenge(AActor* Challenger, float Pressure)
+{
+	if (CurrentState == ECQBAIState::Surrender || !GetPawn())
+	{
+		return false;
+	}
+
+	const float Total = EvaluateCompliance(Challenger) + Pressure;
+
+	ASquadManager* Squad = ASquadManager::GetSquadManager(this);
+
+	if (Total < ComplianceThreshold)
+	{
+		// refused, and now it knows where the shouting came from
+		if (Challenger)
+		{
+			CurrentTarget = Challenger;
+			LastStimulusLocation = Challenger->GetActorLocation();
+
+			if (CurrentState == ECQBAIState::Idle)
+			{
+				SetState(ECQBAIState::Investigate);
+			}
+		}
+
+		if (Squad)
+		{
+			Squad->Broadcast(ECalloutType::Defiant, this);
+		}
+
+		UE_LOG(LogProjectTF, Log, TEXT("CQB: %s refused the challenge (%.2f of %.2f)"),
+			*DisplayName, Total, ComplianceThreshold);
+		return false;
+	}
+
+	SetState(ECQBAIState::Surrender);
+
+	if (Squad)
+	{
+		Squad->Broadcast(ECalloutType::Surrendering, this);
+	}
+
+	UE_LOG(LogProjectTF, Log, TEXT("CQB: %s surrendered (%.2f of %.2f)"),
+		*DisplayName, Total, ComplianceThreshold);
+	return true;
+}
+
+//~ Surrender ------------------------------------------------------------------
+
+void AEnemyAIController::EnterSurrender()
+{
+	SetFiring(false);
+	StopMovement();
+	ClearFocus(EAIFocusPriority::Gameplay);
+	SetFacePlayerMode(false);
+
+	bHasGoal = false;
+
+	if (AEnemyCharacter* MyCharacter = Cast<AEnemyCharacter>(GetPawn()))
+	{
+		MyCharacter->SetSurrendered(true);
+	}
+
+	// a squad member who gave up frees the role they were holding
+	if (SquadRole != ESquadRole::None)
+	{
+		if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+		{
+			Squad->NotifyEnemyDied(this);
+		}
+	}
+}
+
+void AEnemyAIController::UpdateSurrender(float DeltaTime)
+{
+	// kneeling, and staying that way
 }

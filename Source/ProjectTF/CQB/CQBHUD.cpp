@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerController.h"
 #include "EnemyCharacter.h"
 #include "DoorwayMarker.h"
+#include "AllyAIController.h"
 #include "ProjectTFCharacter.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
@@ -148,29 +149,90 @@ void ACQBHUD::DrawSquadBar()
 
 	const float CentreX = Canvas->SizeX * 0.5f;
 
-	// what the squad is doing right now
-	const FString Orders = Player->GetSquadOrderSummary();
-	if (!Orders.IsEmpty())
+	// squad roster down the right hand side, the way a team readout usually reads
+	const TArray<AAllyAIController*> Squad = Player->GetSquad();
+	const ESquadElement Selected = Player->GetSelectedElement();
+
+	float RowY = Canvas->SizeY - 190.0f;
+
+	for (const AAllyAIController* Member : Squad)
 	{
-		const float Width = Orders.Len() * 8.0f;
-		DrawText(Orders, FLinearColor(0.7f, 0.85f, 1.0f), CentreX - Width * 0.5f, Canvas->SizeY - 110.0f, Font, 1.0f);
+		const APawn* MemberPawn = Member->GetPawn();
+		const UHealthComponent* Health = MemberPawn ? MemberPawn->FindComponentByClass<UHealthComponent>() : nullptr;
+
+		FString Status(TEXT("--"));
+		FLinearColor StatusColour = FLinearColor::Gray;
+
+		if (Health)
+		{
+			const float Percent = Health->GetHealthPercent();
+
+			if (Health->IsDead())
+			{
+				Status = TEXT("DOWN");
+				StatusColour = FLinearColor(1.0f, 0.2f, 0.15f);
+			}
+			else if (Percent < 0.5f)
+			{
+				Status = TEXT("HURT");
+				StatusColour = FLinearColor(1.0f, 0.75f, 0.1f);
+			}
+			else
+			{
+				Status = TEXT("OK");
+				StatusColour = FLinearColor(0.6f, 0.9f, 0.6f);
+			}
+		}
+
+		// dim the members this order would not reach
+		const bool bInSelection = (Selected == ESquadElement::All || Member->GetElement() == Selected);
+		const float Dim = bInSelection ? 1.0f : 0.4f;
+
+		const FLinearColor ElementColour = (Member->GetElement() == ESquadElement::Red)
+			? FLinearColor(1.0f, 0.45f, 0.45f) : FLinearColor(0.45f, 0.65f, 1.0f);
+
+		const FString Row = FString::Printf(TEXT("%-4s %-8s %-5s %s"),
+			*FCQBNames::ElementToString(Member->GetElement()),
+			*Member->GetDisplayName(),
+			*Status,
+			*Member->GetOrderName());
+
+		DrawText(Row, ElementColour * Dim, Canvas->SizeX - 330.0f, RowY, Font, 0.95f);
+
+		// status word in its own colour, over the placeholder in the row
+		DrawText(Status, StatusColour * Dim, Canvas->SizeX - 330.0f + 118.0f, RowY, Font, 0.95f);
+
+		RowY += 22.0f;
 	}
 
-	// aiming at a doorway turns 1 and 2 into orders about it
-	if (const ADoorwayMarker* Doorway = Player->GetAimedDoorway())
-	{
-		const FString Hint = FString::Printf(TEXT("%s    [1] Stack    [2] Clear"), *Doorway->GetDisplayName());
-		const float Width = Hint.Len() * 11.0f;
+	// which element the next order goes to
+	const FString ElementLine = FString::Printf(TEXT("COMMANDING: %s"), *FCQBNames::ElementToString(Selected));
+	const FLinearColor ElementLineColour = (Selected == ESquadElement::Red) ? FLinearColor(1.0f, 0.45f, 0.45f)
+		: (Selected == ESquadElement::Blue ? FLinearColor(0.45f, 0.65f, 1.0f) : FLinearColor(1.0f, 0.85f, 0.4f));
 
-		DrawText(Hint, FLinearColor(1.0f, 0.9f, 0.4f), CentreX - Width * 0.5f, Canvas->SizeY - 145.0f, Font, 1.15f);
+	DrawText(ElementLine, ElementLineColour, Canvas->SizeX - 330.0f, RowY + 6.0f, Font, 1.0f);
+
+	// context hint under the crosshair
+	FString Hint;
+	FLinearColor HintColour(0.55f, 0.55f, 0.6f);
+
+	if (Player->GetChallengeTarget())
+	{
+		Hint = TEXT("[F] Shout: drop the weapon");
+		HintColour = FLinearColor(1.0f, 0.9f, 0.4f);
+	}
+	else if (const ADoorwayMarker* Doorway = Player->GetAimedDoorway())
+	{
+		Hint = FString::Printf(TEXT("%s    [1] Stack    [2] Clear"), *Doorway->GetDisplayName());
+		HintColour = FLinearColor(1.0f, 0.9f, 0.4f);
 	}
 	else
 	{
-		const FString Hint(TEXT("[Z] Follow    [H] Hold    aim a doorway for Stack / Clear"));
-		const float Width = Hint.Len() * 7.0f;
-
-		DrawText(Hint, FLinearColor(0.55f, 0.55f, 0.6f), CentreX - Width * 0.5f, Canvas->SizeY - 145.0f, Font, 0.85f);
+		Hint = TEXT("[Z] Follow   [H] Hold   [3] Watch   wheel: pick element");
 	}
+
+	const float Width = Hint.Len() * 8.5f;
+	DrawText(Hint, HintColour, CentreX - Width * 0.5f, Canvas->SizeY - 145.0f, Font, 1.0f);
 }
 
 //~ Debug console commands ----------------------------------------------------

@@ -40,6 +40,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Squad Order")
 	void OrderClear(ADoorwayMarker* Doorway);
 
+	/** Holds where it stands and keeps eyes on a point */
+	UFUNCTION(BlueprintCallable, Category = "Squad Order")
+	void OrderWatch(const FVector& Point);
+
+	/** Red or Blue. Orders can be given to one element or to the whole squad. */
+	ESquadElement GetElement() const { return Element; }
+	void SetElement(ESquadElement InElement) { Element = InElement; }
+
 	/** The order this squad member is currently carrying out, for the HUD */
 	UFUNCTION(BlueprintPure, Category = "Squad Order")
 	FString GetOrderName() const;
@@ -68,6 +76,12 @@ protected:
 
 	void EnterClear();
 	void UpdateClear(float DeltaTime);
+
+	void EnterWatch();
+	void UpdateWatch(float DeltaTime);
+
+	/** Draws where the current order sent this squad member, for a few seconds after it lands */
+	void DrawOrderMarker(float DeltaTime);
 
 	/** Says something and prints it where the player can read it */
 	void Say(ECalloutType Callout);
@@ -99,6 +113,22 @@ protected:
 
 	/** Seconds the room has looked empty */
 	float RoomQuietTime = 0.0f;
+
+	/** Which half of the squad this member belongs to */
+	ESquadElement Element = ESquadElement::Red;
+
+	/** Point the watch order named */
+	FVector WatchPoint = FVector::ZeroVector;
+
+	/** Where the last order sent this member, drawn on the floor while fresh */
+	FVector OrderMarkerPoint = FVector::ZeroVector;
+
+	/** Seconds of order marker left */
+	float OrderMarkerTime = 0.0f;
+
+	/** How long an order marker stays on the floor */
+	UPROPERTY(EditDefaultsOnly, Category = "Squad Order")
+	float OrderMarkerDuration = 4.0f;
 
 	/** True once the arrival callout has been said, so it is not repeated every frame */
 	bool bAnnouncedArrival = false;

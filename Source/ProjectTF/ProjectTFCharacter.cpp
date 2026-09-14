@@ -16,6 +16,9 @@
 #include "CQB/WeaponVisualComponent.h"
 #include "CQB/DoorwayMarker.h"
 #include "CQB/AllyAIController.h"
+#include "CQB/EnemyAIController.h"
+#include "CQB/EnemyCharacter.h"
+#include "Perception/AISense_Hearing.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
 #include "Misc/CommandLine.h"
@@ -109,6 +112,7 @@ void AProjectTFCharacter::Tick(float DeltaSeconds)
 	CurrentLeanOffset = FMath::FInterpTo(CurrentLeanOffset, LeanTarget * LeanOffsetDistance, DeltaSeconds, LeanInterpSpeed);
 
 	UpdateAimedDoorway();
+	UpdateChallengeTarget();
 
 
 
@@ -203,6 +207,10 @@ void AProjectTFCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &AProjectTFCharacter::CommandHold);
 		PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &AProjectTFCharacter::CommandStackOrOne);
 		PlayerInputComponent->BindKey(EKeys::Two, IE_Pressed, this, &AProjectTFCharacter::CommandClearOrTwo);
+		PlayerInputComponent->BindKey(EKeys::Three, IE_Pressed, this, &AProjectTFCharacter::CommandWatch);
+		PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &AProjectTFCharacter::CommandChallenge);
+		PlayerInputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &AProjectTFCharacter::CycleElementUp);
+		PlayerInputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &AProjectTFCharacter::CycleElementDown);
 	}
 }
 
@@ -400,29 +408,134 @@ TArray<AAllyAIController*> AProjectTFCharacter::GetSquad() const
 		}
 	}
 
+	// stable order, so Red always lists before Blue
+	Squad.Sort([](const AAllyAIController& A, const AAllyAIController& B)
+	{
+		return A.GetDisplayName() < B.GetDisplayName();
+	});
+
 	return Squad;
 }
 
-FString AProjectTFCharacter::GetSquadOrderSummary() const
+TArray<AAllyAIController*> AProjectTFCharacter::GetSelectedSquad() const
 {
-	FString Summary;
+	TArray<AAllyAIController*> Selected;
 
-	for (const AAllyAIController* Member : GetSquad())
+	for (AAllyAIController* Member : GetSquad())
 	{
-		if (!Summary.IsEmpty())
+		if (SelectedElement == ESquadElement::All || Member->GetElement() == SelectedElement)
 		{
-			Summary += TEXT("   ");
+			Selected.Add(Member);
 		}
-
-		Summary += FString::Printf(TEXT("%s: %s"), *Member->GetDisplayName(), *Member->GetOrderName());
 	}
 
-	return Summary;
+	return Selected;
+}
+
+void AProjectTFCharacter::CycleElementUp()
+{
+	SelectedElement = (SelectedElement == ESquadElement::All) ? ESquadElement::Red
+		: (SelectedElement == ESquadElement::Red ? ESquadElement::Blue : ESquadElement::All);
+}
+
+void AProjectTFCharacter::CycleElementDown()
+{
+	SelectedElement = (SelectedElement == ESquadElement::All) ? ESquadElement::Blue
+		: (SelectedElement == ESquadElement::Blue ? ESquadElement::Red : ESquadElement::All);
+}
+
+bool AProjectTFCharacter::GetAimedPoint(FVector& OutPoint) const
+{
+	const UWorld* World = GetWorld();
+	if (!World || !FirstPersonCameraComponent)
+	{
+		return false;
+	}
+
+	const FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+	const FVector End = Start + GetBaseAimRotation().Vector() * 6000.0f;
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBOrderPoint), false, this);
+
+	FHitResult Hit;
+	if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+	{
+		OutPoint = Hit.ImpactPoint;
+		return true;
+	}
+
+	return false;
+}
+
+void AProjectTFCharacter::UpdateChallengeTarget()
+{
+	ChallengeTarget = nullptr;
+
+	const UWorld* World = GetWorld();
+	if (!World || !FirstPersonCameraComponent)
+	{
+		return;
+	}
+
+	const FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+	const FVector End = Start + GetBaseAimRotation().Vector() * ChallengeRange;
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBChallenge), false, this);
+
+	FHitResult Hit;
+	if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+	{
+		return;
+	}
+
+	AEnemyCharacter* Suspect = Cast<AEnemyCharacter>(Hit.GetActor());
+	if (Suspect && !Suspect->IsDead() && !Suspect->IsSurrendered()
+		&& FCQBFactions::AreHostile(this, Suspect))
+	{
+		ChallengeTarget = Suspect;
+	}
+}
+
+void AProjectTFCharacter::CommandChallenge()
+{
+	if (!ChallengeTarget)
+	{
+		return;
+	}
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(32000, 2.5f, FColor::Yellow,
+			FString::Printf(TEXT("[You] %s"), *FCQBNames::CalloutToString(ECalloutType::Challenge)));
+	}
+
+	// a shout is a noise like any other; anyone nearby hears it
+	UAISense_Hearing::ReportNoiseEvent(GetWorld(), GetActorLocation(), 1.5f, this, ChallengeRange, TEXT("Shout"));
+
+	if (AEnemyAIController* Brain = Cast<AEnemyAIController>(Cast<APawn>(ChallengeTarget)->GetController()))
+	{
+		// aiming straight at them is what makes a demand credible
+		Brain->ReceiveChallenge(this, 0.35f);
+	}
+}
+
+void AProjectTFCharacter::CommandWatch()
+{
+	FVector Point;
+	if (!GetAimedPoint(Point))
+	{
+		return;
+	}
+
+	for (AAllyAIController* Member : GetSelectedSquad())
+	{
+		Member->OrderWatch(Point);
+	}
 }
 
 void AProjectTFCharacter::CommandFollow()
 {
-	for (AAllyAIController* Member : GetSquad())
+	for (AAllyAIController* Member : GetSelectedSquad())
 	{
 		Member->OrderFollow();
 	}
@@ -430,7 +543,7 @@ void AProjectTFCharacter::CommandFollow()
 
 void AProjectTFCharacter::CommandHold()
 {
-	for (AAllyAIController* Member : GetSquad())
+	for (AAllyAIController* Member : GetSelectedSquad())
 	{
 		Member->OrderHold();
 	}
@@ -444,7 +557,7 @@ void AProjectTFCharacter::CommandStackOrOne()
 	}
 
 	// the squad splits across the doorway, one side each
-	TArray<AAllyAIController*> Squad = GetSquad();
+	TArray<AAllyAIController*> Squad = GetSelectedSquad();
 
 	for (int32 Index = 0; Index < Squad.Num(); ++Index)
 	{
@@ -460,7 +573,7 @@ void AProjectTFCharacter::CommandClearOrTwo()
 		return;
 	}
 
-	for (AAllyAIController* Member : GetSquad())
+	for (AAllyAIController* Member : GetSelectedSquad())
 	{
 		Member->OrderClear(AimedDoorway);
 	}
@@ -493,6 +606,44 @@ void AProjectTFCharacter::RunScriptedOrder()
 	if (Order == TEXT("hold"))
 	{
 		CommandHold();
+	}
+	else if (Order == TEXT("watch"))
+	{
+		// aim at the far wall of the room beyond and have the squad keep eyes on it
+		for (AAllyAIController* Member : GetSelectedSquad())
+		{
+			Member->OrderWatch(AimedDoorway ? AimedDoorway->GetClearPoint() : GetActorLocation());
+		}
+	}
+	else if (Order == TEXT("challenge"))
+	{
+		// shout at the nearest standing suspect, wherever the crosshair happens to be
+		AEnemyCharacter* Nearest = nullptr;
+		float NearestDistance = TNumericLimits<float>::Max();
+
+		for (TActorIterator<AEnemyCharacter> It(GetWorld()); It; ++It)
+		{
+			AEnemyCharacter* Suspect = *It;
+			if (!Suspect || Suspect->IsDead() || Suspect->IsSurrendered()
+				|| !FCQBFactions::AreHostile(this, Suspect))
+			{
+				continue;
+			}
+
+			const float Distance = FVector::Dist(GetActorLocation(), Suspect->GetActorLocation());
+			if (Distance < NearestDistance)
+			{
+				NearestDistance = Distance;
+				Nearest = Suspect;
+			}
+		}
+
+		if (Nearest)
+		{
+			UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: challenging %s at %.0f"), *Nearest->GetName(), NearestDistance);
+			ChallengeTarget = Nearest;
+			CommandChallenge();
+		}
 	}
 	else if (Order == TEXT("stack"))
 	{

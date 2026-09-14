@@ -53,6 +53,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Enemy")
 	bool IsDead() const { return bIsDead; }
 
+	/** Gave up: weapon down, no longer a threat. Anyone can ask, the controller sets it. */
+	UFUNCTION(BlueprintPure, Category = "Enemy")
+	bool IsSurrendered() const { return bSurrendered; }
+
+	/** Puts the weapon away and drops into a kneel. Called by the AI controller. */
+	void SetSurrendered(bool bInSurrendered);
+
 	//~Begin ICQBFactionAgent
 	virtual ECQBFaction GetFaction() const override { return Faction; }
 	//~End ICQBFactionAgent
@@ -115,6 +122,8 @@ protected:
 	float EnemyAimSpreadHalfAngle = 4.0f;
 
 	bool bIsDead = false;
+
+	bool bSurrendered = false;
 
 	FTimerHandle DestroyTimerHandle;
 };

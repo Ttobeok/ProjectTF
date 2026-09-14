@@ -297,9 +297,12 @@ def build_gameplay_actors():
         if ally_spawner:
             ally_spawner.set_actor_label("AllySpawner")
             ally_spawner.set_editor_property("enemy_class", ally_class)
+            # four members, so Red and Blue are two apiece
             ally_spawner.set_editor_property("spawn_offsets", [
-                unreal.Vector(-60.0, -90.0, 0.0),
-                unreal.Vector(-60.0, 90.0, 0.0),
+                unreal.Vector(-60.0, -110.0, 0.0),
+                unreal.Vector(-60.0, 110.0, 0.0),
+                unreal.Vector(-170.0, -110.0, 0.0),
+                unreal.Vector(-170.0, 110.0, 0.0),
             ])
 
     spawner.set_editor_property("spawn_offsets", [

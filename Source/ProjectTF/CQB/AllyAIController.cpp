@@ -9,6 +9,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "NavigationSystem.h"
+#include "DrawDebugHelpers.h"
 #include "ProjectTF.h"
 
 AAllyAIController::AAllyAIController()
@@ -31,7 +32,11 @@ void AAllyAIController::OnPossess(APawn* InPawn)
 		}
 	}
 
-	SetDisplayName(FString::Printf(TEXT("Ally_%d"), Taken + 1));
+	// even numbers go Red, odd go Blue, so a four member squad splits two and two
+	Element = (Taken % 2 == 0) ? ESquadElement::Red : ESquadElement::Blue;
+
+	SetDisplayName(FString::Printf(TEXT("%s_%d"),
+		Element == ESquadElement::Red ? TEXT("RED") : TEXT("BLU"), (Taken / 2) + 1));
 
 	// squad members start at the player's shoulder
 	OrderFollow();
@@ -93,6 +98,15 @@ void AAllyAIController::OrderStack(ADoorwayMarker* Doorway, EStackSide Side)
 	Say(ECalloutType::Moving);
 }
 
+void AAllyAIController::OrderWatch(const FVector& Point)
+{
+	OrderedDoorway = nullptr;
+	WatchPoint = Point;
+	StandingOrder = ECQBAIState::Watch;
+	SetState(ECQBAIState::Watch);
+	Say(ECalloutType::Watching);
+}
+
 void AAllyAIController::OrderClear(ADoorwayMarker* Doorway)
 {
 	if (!Doorway)
@@ -116,6 +130,7 @@ void AAllyAIController::EnterState(ECQBAIState State)
 	case ECQBAIState::Hold:		EnterHold(); break;
 	case ECQBAIState::Stack:	EnterStack(); break;
 	case ECQBAIState::Clear:	EnterClear(); break;
+	case ECQBAIState::Watch:	EnterWatch(); break;
 	default:					Super::EnterState(State); break;
 	}
 }
@@ -128,6 +143,7 @@ void AAllyAIController::UpdateState(ECQBAIState State, float DeltaTime)
 	case ECQBAIState::Hold:		UpdateHold(DeltaTime); break;
 	case ECQBAIState::Stack:	UpdateStack(DeltaTime); break;
 	case ECQBAIState::Clear:	UpdateClear(DeltaTime); break;
+	case ECQBAIState::Watch:	UpdateWatch(DeltaTime); break;
 	default:					Super::UpdateState(State, DeltaTime); break;
 	}
 }
@@ -140,6 +156,7 @@ void AAllyAIController::ExitState(ECQBAIState State)
 	case ECQBAIState::Hold:
 	case ECQBAIState::Stack:
 	case ECQBAIState::Clear:
+	case ECQBAIState::Watch:
 		SetFiring(false);
 		break;
 
@@ -151,10 +168,13 @@ void AAllyAIController::ExitState(ECQBAIState State)
 
 void AAllyAIController::UpdateGlobalTransitions(float DeltaTime)
 {
+	DrawOrderMarker(DeltaTime);
+
 	// An order state that spots a hostile drops into the inherited combat states, and the order
 	// is remembered so the squad member can pick it back up once the shooting stops.
 	const bool bOnOrder = (CurrentState == ECQBAIState::Follow || CurrentState == ECQBAIState::Hold
-		|| CurrentState == ECQBAIState::Stack || CurrentState == ECQBAIState::Clear);
+		|| CurrentState == ECQBAIState::Stack || CurrentState == ECQBAIState::Clear
+		|| CurrentState == ECQBAIState::Watch);
 
 	if (bOnOrder)
 	{
@@ -255,7 +275,10 @@ void AAllyAIController::EnterStack()
 
 	if (OrderedDoorway)
 	{
-		MoveToPoint(OrderedDoorway->GetStackPoint(StackSide));
+		const FVector Point = OrderedDoorway->GetStackPoint(StackSide);
+		MoveToPoint(Point);
+		OrderMarkerPoint = Point;
+		OrderMarkerTime = OrderMarkerDuration;
 	}
 }
 
@@ -291,7 +314,10 @@ void AAllyAIController::EnterClear()
 
 	if (OrderedDoorway)
 	{
-		MoveToPoint(OrderedDoorway->GetClearPoint());
+		const FVector Point = OrderedDoorway->GetClearPoint();
+		MoveToPoint(Point);
+		OrderMarkerPoint = Point;
+		OrderMarkerTime = OrderMarkerDuration;
 	}
 }
 
@@ -320,4 +346,43 @@ void AAllyAIController::UpdateClear(float DeltaTime)
 		Say(ECalloutType::RoomClear);
 		OrderFollow();
 	}
+}
+
+
+//~ Watch ----------------------------------------------------------------------
+
+void AAllyAIController::EnterWatch()
+{
+	StopMovement();
+	bHasGoal = false;
+	SetFiring(false);
+	SetFacePlayerMode(true);
+
+	// eyes on the point the player named, and stay there
+	SetFocalPoint(WatchPoint, EAIFocusPriority::Gameplay);
+
+	OrderMarkerPoint = WatchPoint;
+	OrderMarkerTime = OrderMarkerDuration;
+}
+
+void AAllyAIController::UpdateWatch(float DeltaTime)
+{
+	// standing and watching. Contact drops into the inherited combat states.
+}
+
+//~ Order marker ----------------------------------------------------------------
+
+void AAllyAIController::DrawOrderMarker(float DeltaTime)
+{
+	if (OrderMarkerTime <= 0.0f)
+	{
+		return;
+	}
+
+	OrderMarkerTime -= DeltaTime;
+
+	// a ring on the floor where the order sent this member, so the player can see it land
+	const FColor Colour = (Element == ESquadElement::Red) ? FColor(230, 60, 60) : FColor(60, 120, 230);
+	DrawDebugCircle(GetWorld(), OrderMarkerPoint + FVector(0.0f, 0.0f, 4.0f), 45.0f, 24, Colour,
+		false, DeltaTime, 0, 3.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
 }

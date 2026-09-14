@@ -34,7 +34,20 @@ enum class ECQBAIState : uint8
 	Follow		UMETA(DisplayName = "Follow"),
 	Hold		UMETA(DisplayName = "Hold"),
 	Stack		UMETA(DisplayName = "Stack"),
-	Clear		UMETA(DisplayName = "Clear")
+	Clear		UMETA(DisplayName = "Clear"),
+	Watch		UMETA(DisplayName = "Watch"),
+
+	/** Gave up. Weapon down, hands up, no longer a threat to anyone. */
+	Surrender	UMETA(DisplayName = "Surrender")
+};
+
+/** Which half of the squad an order is aimed at */
+UENUM(BlueprintType)
+enum class ESquadElement : uint8
+{
+	Red		UMETA(DisplayName = "Red"),
+	Blue	UMETA(DisplayName = "Blue"),
+	All		UMETA(DisplayName = "Gold")
 };
 
 /** Combat role handed out by the SquadManager */
@@ -61,7 +74,15 @@ enum class ECalloutType : uint8
 	InPosition		UMETA(DisplayName = "In Position"),
 	RoomClear		UMETA(DisplayName = "Room Clear"),
 	Moving			UMETA(DisplayName = "Moving"),
-	Holding			UMETA(DisplayName = "Holding")
+	Holding			UMETA(DisplayName = "Holding"),
+	Watching		UMETA(DisplayName = "Watching"),
+
+	/** Shouted at a suspect */
+	Challenge		UMETA(DisplayName = "Challenge"),
+	/** A suspect gave up */
+	Surrendering	UMETA(DisplayName = "Surrendering"),
+	/** A suspect refused */
+	Defiant			UMETA(DisplayName = "Defiant")
 };
 
 /** Which side of a doorway a squad member stacks on */
@@ -108,6 +129,8 @@ struct FCQBNames
 		case ECQBAIState::Hold:			return TEXT("Hold");
 		case ECQBAIState::Stack:		return TEXT("Stack");
 		case ECQBAIState::Clear:		return TEXT("Clear");
+		case ECQBAIState::Watch:		return TEXT("Watch");
+		case ECQBAIState::Surrender:	return TEXT("Surrender");
 		}
 		return TEXT("Unknown");
 	}
@@ -138,8 +161,22 @@ struct FCQBNames
 		case ECalloutType::RoomClear:		return TEXT("Room clear!");
 		case ECalloutType::Moving:			return TEXT("Moving!");
 		case ECalloutType::Holding:			return TEXT("Holding");
+		case ECalloutType::Watching:		return TEXT("Watching that");
+		case ECalloutType::Challenge:		return TEXT("Drop the weapon!");
+		case ECalloutType::Surrendering:	return TEXT("Hands up, I give up!");
+		case ECalloutType::Defiant:			return TEXT("Not a chance!");
 		}
 		return TEXT("...");
+	}
+
+	static FString ElementToString(ESquadElement Element)
+	{
+		switch (Element)
+		{
+		case ESquadElement::Red:	return TEXT("RED");
+		case ESquadElement::Blue:	return TEXT("BLUE");
+		default:					return TEXT("GOLD");
+		}
 	}
 
 	static FString FactionToString(ECQBFaction Faction)

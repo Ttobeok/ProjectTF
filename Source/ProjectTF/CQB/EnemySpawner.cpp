@@ -125,6 +125,15 @@ void AEnemySpawner::ReportNavigationState()
 
 void AEnemySpawner::DebugKillOneEnemy()
 {
+	// -CQBKillCount=N takes out several at once, for testing how isolation affects compliance.
+	// -CQBKillDamage=<fraction of max health> wounds instead of killing, which is the other
+	// half of what makes a suspect give up.
+	int32 KillCount = 1;
+	FParse::Value(FCommandLine::Get(), TEXT("CQBKillCount="), KillCount);
+
+	float DamageFraction = 10.0f;
+	FParse::Value(FCommandLine::Get(), TEXT("CQBKillDamage="), DamageFraction);
+
 	// the ally spawner shares this class, and killing a squad member is not what the flag asks for
 	if (!SpawnedEnemies.IsEmpty() && IsValid(SpawnedEnemies[0])
 		&& SpawnedEnemies[0]->GetFaction() != ECQBFaction::Enemy)
@@ -141,9 +150,14 @@ void AEnemySpawner::DebugKillOneEnemy()
 
 		if (UHealthComponent* Health = Enemy->GetHealthComponent())
 		{
-			UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: killing %s"), *Enemy->GetName());
-			Health->TakeDamage(Health->MaxHealth * 10.0f, this, nullptr);
-			return;
+			UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: hitting %s for %.0f%% of health"),
+				*Enemy->GetName(), DamageFraction * 100.0f);
+			Health->TakeDamage(Health->MaxHealth * DamageFraction, this, nullptr);
+
+			if (--KillCount <= 0)
+			{
+				return;
+			}
 		}
 	}
 

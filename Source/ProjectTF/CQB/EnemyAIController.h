@@ -72,6 +72,19 @@ public:
 	 */
 	virtual FGenericTeamId GetGenericTeamId() const override;
 
+	/**
+	 *  Someone shouted at this AI to give up.
+	 *
+	 *  Pressure is how convincing the demand is, 0 to 1, and it is weighed against how much
+	 *  fight the AI has left. Returns true when it complies.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "AI")
+	bool ReceiveChallenge(AActor* Challenger, float Pressure);
+
+	/** True once this AI has given up */
+	UFUNCTION(BlueprintPure, Category = "AI")
+	bool HasSurrendered() const { return CurrentState == ECQBAIState::Surrender; }
+
 	/** A squad mate said something. Idle enemies move to investigate a contact. */
 	void OnCalloutReceived(ECalloutType Callout, AEnemyAIController* From);
 
@@ -126,6 +139,12 @@ protected:
 	void EnterSuppress();
 	void UpdateSuppress(float DeltaTime);
 	void ExitSuppress();
+
+	void EnterSurrender();
+	void UpdateSurrender(float DeltaTime);
+
+	/** How close this AI is to giving up, 0 to 1. Hurt, alone and cornered all push it up. */
+	float EvaluateCompliance(const AActor* Challenger) const;
 
 	/** Transitions that apply no matter which state is running, such as losing the player */
 	virtual void UpdateGlobalTransitions(float DeltaTime);
@@ -249,6 +268,18 @@ protected:
 	/** Side this controller fights for */
 	UPROPERTY(EditDefaultsOnly, Category = "AI")
 	ECQBFaction Faction = ECQBFaction::Enemy;
+
+	/** Wounded AI gives up more readily. Below this share of health it is already wavering. */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Compliance")
+	float ComplianceHealthThreshold = 0.6f;
+
+	/** A demand shouted from further than this carries no weight */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Compliance")
+	float ComplianceRange = 1200.0f;
+
+	/** Total pressure needed before the AI gives up */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Compliance")
+	float ComplianceThreshold = 1.0f;
 
 	/** Draw the state name over the pawn */
 	UPROPERTY(EditDefaultsOnly, Category = "AI|Debug")

@@ -9,6 +9,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "WeaponVisualComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "NavigationInvokerComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -146,6 +147,44 @@ void AEnemyCharacter::OnEnemyDeath(AActor* DeadActor, AActor* Killer)
 		else
 		{
 			DeferredDestroy();
+		}
+	}
+}
+
+void AEnemyCharacter::SetSurrendered(bool bInSurrendered)
+{
+	if (bSurrendered == bInSurrendered || bIsDead)
+	{
+		return;
+	}
+
+	bSurrendered = bInSurrendered;
+
+	if (WeaponComponent)
+	{
+		WeaponComponent->StopFire();
+	}
+
+	// the weapon goes away, which is the whole point of a surrender
+	if (WeaponVisual)
+	{
+		WeaponVisual->SetVisibility(!bSurrendered, true);
+	}
+
+	// crouch reads as hands up well enough without an animation for it
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+
+		if (bSurrendered)
+		{
+			Movement->DisableMovement();
+			GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -150.0f));
+		}
+		else
+		{
+			Movement->SetMovementMode(MOVE_Walking);
+			GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
 		}
 	}
 }

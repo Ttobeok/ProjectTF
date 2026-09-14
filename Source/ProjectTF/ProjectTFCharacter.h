@@ -140,9 +140,19 @@ public:
 	UFUNCTION(BlueprintPure, Category="Squad")
 	ADoorwayMarker* GetAimedDoorway() const { return AimedDoorway; }
 
-	/** Order every squad member is currently on, for the HUD */
+	/** Every living squad member, for the HUD */
+	TArray<AAllyAIController*> GetSquad() const;
+
+	/** Squad members the current element selection would take an order */
+	TArray<AAllyAIController*> GetSelectedSquad() const;
+
+	/** Which element the player is commanding right now */
 	UFUNCTION(BlueprintPure, Category="Squad")
-	FString GetSquadOrderSummary() const;
+	ESquadElement GetSelectedElement() const { return SelectedElement; }
+
+	/** Suspect under the crosshair that could be shouted at, or null */
+	UFUNCTION(BlueprintPure, Category="Squad")
+	AActor* GetChallengeTarget() const { return ChallengeTarget; }
 
 protected:
 
@@ -201,8 +211,24 @@ protected:
 	void CommandStackOrOne();
 	void CommandClearOrTwo();
 
+	/** Orders the selected element to watch the point under the crosshair */
+	void CommandWatch();
+
+	/** Shouts at the suspect under the crosshair to give up */
+	void CommandChallenge();
+
+	/** Mouse wheel cycles Red, Blue and the whole squad */
+	void CycleElementUp();
+	void CycleElementDown();
+
 	/** Traces from the camera for a doorway the player might be ordering against */
 	void UpdateAimedDoorway();
+
+	/** Traces for a suspect the player could shout at */
+	void UpdateChallengeTarget();
+
+	/** Point under the crosshair, for move and watch orders. Returns false when nothing is hit. */
+	bool GetAimedPoint(FVector& OutPoint) const;
 
 	/**
 	 *  Issues an order from the command line, so the squad can be driven without a keyboard:
@@ -212,9 +238,6 @@ protected:
 	void RunScriptedOrder();
 
 	FTimerHandle ScriptedOrderTimer;
-
-	/** Every living squad member */
-	TArray<AAllyAIController*> GetSquad() const;
 
 	/** How far the player can be from a doorway and still give orders about it */
 	UPROPERTY(EditDefaultsOnly, Category="Squad")
@@ -227,6 +250,17 @@ protected:
 	/** Doorway under the crosshair this frame */
 	UPROPERTY(Transient)
 	TObjectPtr<ADoorwayMarker> AimedDoorway;
+
+	/** Suspect under the crosshair this frame, if one is close enough to shout at */
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> ChallengeTarget;
+
+	/** Element the orders go to */
+	ESquadElement SelectedElement = ESquadElement::All;
+
+	/** How far a shouted demand carries */
+	UPROPERTY(EditDefaultsOnly, Category="Squad")
+	float ChallengeRange = 1500.0f;
 
 	void LeanLeftStart() { DoLean(-1.0f); }
 	void LeanRightStart() { DoLean(1.0f); }
