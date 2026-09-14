@@ -7,7 +7,7 @@
 #include "EnemyAIController.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Variant_Shooter/Weapons/ShooterWeapon.h"
+#include "WeaponVisualComponent.h"
 #include "NavigationInvokerComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -32,6 +32,11 @@ AEnemyCharacter::AEnemyCharacter()
 	}
 
 	GetMesh()->SetRelativeLocationAndRotation(FVector(0.0f, 0.0f, -96.0f), FRotator(0.0f, -90.0f, 0.0f));
+
+	// the visible rifle, on the hand the template animations grip with
+	WeaponVisual = CreateDefaultSubobject<UWeaponVisualComponent>(TEXT("Weapon Visual"));
+	WeaponVisual->SetupAttachment(GetMesh(), FName("HandGrip_R"));
+	WeaponVisual->AttachMode = EWeaponAttachMode::HandSocket;
 
 	// gameplay components, the same ones the player uses
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("Health Component"));
@@ -82,17 +87,11 @@ void AEnemyCharacter::BeginPlay()
 
 	Super::BeginPlay();
 
-	// Resolved here, never in the constructor: loading this blueprint during class default
-	// object construction deadlocks the async loader.
-	if (!WeaponVisualClass)
+	// Loaded here, never from the constructor: pulling an animation blueprint in during class
+	// default object construction can deadlock the async loader.
+	if (UClass* BodyAnim = BodyAnimAsset.LoadSynchronous())
 	{
-		WeaponVisualClass = WeaponVisualAsset.LoadSynchronous();
-	}
-
-	// spawning the weapon also applies the rifle body pose, through OnWeaponActivated
-	if (WeaponVisualClass)
-	{
-		AddWeaponClass(WeaponVisualClass);
+		GetMesh()->SetAnimInstanceClass(BodyAnim);
 	}
 }
 
@@ -153,78 +152,4 @@ void AEnemyCharacter::OnEnemyDeath(AActor* DeadActor, AActor* Killer)
 void AEnemyCharacter::DeferredDestroy()
 {
 	Destroy();
-}
-
-
-//~ IShooterWeaponHolder ------------------------------------------------------
-
-void AEnemyCharacter::AttachWeaponMeshes(AShooterWeapon* Weapon)
-{
-	const FAttachmentTransformRules AttachmentRule(EAttachmentRule::SnapToTarget, false);
-
-	Weapon->AttachToActor(this, AttachmentRule);
-
-	// enemies are only ever seen from the outside, so the third person mesh is the one that matters
-	Weapon->GetThirdPersonMesh()->AttachToComponent(GetMesh(), AttachmentRule, WeaponSocket);
-	Weapon->GetFirstPersonMesh()->SetVisibility(false);
-}
-
-void AEnemyCharacter::PlayFiringMontage(UAnimMontage* Montage)
-{
-	if (!Montage)
-	{
-		return;
-	}
-
-	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
-	{
-		AnimInstance->Montage_Play(Montage);
-	}
-}
-
-void AEnemyCharacter::AddWeaponRecoil(float Recoil)
-{
-}
-
-void AEnemyCharacter::UpdateWeaponHUD(int32 CurrentAmmo, int32 MagazineSize)
-{
-}
-
-FVector AEnemyCharacter::GetWeaponTargetLocation()
-{
-	return GetPawnViewLocation() + GetBaseAimRotation().Vector() * 10000.0f;
-}
-
-void AEnemyCharacter::AddWeaponClass(const TSubclassOf<AShooterWeapon>& WeaponClass)
-{
-	if (!WeaponClass || WeaponVisual)
-	{
-		return;
-	}
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this;
-	SpawnParams.Instigator = this;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	SpawnParams.TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot;
-
-	WeaponVisual = GetWorld()->SpawnActor<AShooterWeapon>(WeaponClass, GetActorTransform(), SpawnParams);
-
-	if (WeaponVisual)
-	{
-		WeaponVisual->ActivateWeapon(FName("Enemy"));
-	}
-}
-
-void AEnemyCharacter::OnWeaponActivated(AShooterWeapon* Weapon)
-{
-	GetMesh()->SetAnimInstanceClass(Weapon->GetThirdPersonAnimInstanceClass());
-}
-
-void AEnemyCharacter::OnWeaponDeactivated(AShooterWeapon* Weapon)
-{
-}
-
-void AEnemyCharacter::OnSemiWeaponRefire()
-{
 }

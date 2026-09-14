@@ -12,7 +12,7 @@
 #include "ProjectTF.h"
 #include "CQB/HealthComponent.h"
 #include "CQB/WeaponComponent.h"
-#include "Variant_Shooter/Weapons/ShooterWeapon.h"
+#include "CQB/WeaponVisualComponent.h"
 #include "NavigationInvokerComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
@@ -49,6 +49,11 @@ AProjectTFCharacter::AProjectTFCharacter()
 	WeaponComponent->AimSpreadHalfAngle = 0.25f;
 	WeaponComponent->bApplyRecoilToController = true;
 
+	// the visible weapon, riding the camera. It attaches itself on BeginPlay.
+	WeaponVisual = CreateDefaultSubobject<UWeaponVisualComponent>(TEXT("Weapon Visual"));
+	WeaponVisual->SetupAttachment(FirstPersonCameraComponent);
+	WeaponVisual->AttachMode = EWeaponAttachMode::Camera;
+
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
@@ -73,24 +78,11 @@ void AProjectTFCharacter::BeginPlay()
 		HealthComponent->OnDeath.AddDynamic(this, &AProjectTFCharacter::OnPlayerDeath);
 	}
 
-	if (WeaponComponent)
+	// The arms are not animated to hold anything, so they would be empty handed next to a
+	// weapon that rides the camera. Hiding them keeps the view honest.
+	if (FirstPersonMesh)
 	{
-		WeaponComponent->OnAmmoChanged.AddDynamic(this, &AProjectTFCharacter::OnWeaponAmmoChanged);
-	}
-
-	// Resolved here rather than in the constructor. Loading this blueprint while the class
-	// default object is still being built deadlocks the async loader: the weapon pulls in
-	// animation blueprints that reference the character classes currently under construction,
-	// and the engine dies with "Loading is stuck, flush will never finish".
-	if (!WeaponVisualClass)
-	{
-		WeaponVisualClass = WeaponVisualAsset.LoadSynchronous();
-	}
-
-	// spawning the weapon also sets the mesh anim instances, through OnWeaponActivated
-	if (WeaponVisualClass)
-	{
-		AddWeaponClass(WeaponVisualClass);
+		FirstPersonMesh->SetVisibility(false, false);
 	}
 }
 
@@ -102,16 +94,6 @@ void AProjectTFCharacter::Tick(float DeltaSeconds)
 	CurrentLeanRoll = FMath::FInterpTo(CurrentLeanRoll, LeanTarget * LeanRollAngle, DeltaSeconds, LeanInterpSpeed);
 	CurrentLeanOffset = FMath::FInterpTo(CurrentLeanOffset, LeanTarget * LeanOffsetDistance, DeltaSeconds, LeanInterpSpeed);
 
-	// settle the weapon back after a shot, so firing reads as more than a debug line
-	if (WeaponVisual)
-	{
-		FireKickAlpha = FMath::FInterpTo(FireKickAlpha, 0.0f, DeltaSeconds, FireKickRecoverySpeed);
-
-		const FVector KickedLocation = WeaponViewOffset - FVector(FireKickDistance * FireKickAlpha, 0.0f, 0.0f);
-		const FRotator KickedRotation = WeaponViewRotation + FRotator(FireKickPitch * FireKickAlpha, 0.0f, 0.0f);
-
-		WeaponVisual->GetFirstPersonMesh()->SetRelativeLocationAndRotation(KickedLocation, KickedRotation);
-	}
 
 
 }
@@ -295,104 +277,6 @@ void AProjectTFCharacter::DoReload()
 	}
 }
 
-void AProjectTFCharacter::OnWeaponAmmoChanged(int32 CurrentAmmo, int32 MagSize)
-{
-	// a shot lowers the count; a finished reload fills it, and should not kick
-	if (CurrentAmmo < MagSize)
-	{
-		FireKickAlpha = 1.0f;
-	}
-}
-
-//~ IShooterWeaponHolder ------------------------------------------------------
-
-void AProjectTFCharacter::AttachWeaponMeshes(AShooterWeapon* Weapon)
-{
-	const FAttachmentTransformRules AttachmentRule(EAttachmentRule::SnapToTarget, false);
-
-	Weapon->AttachToActor(this, AttachmentRule);
-
-	// The weapon rides the camera, not the hands.
-	//
-	// The template arm animation only tracks the camera when the character feeds it aim data,
-	// which this character does not have. Parented to the hands the weapon swung the opposite
-	// way on every turn and stayed level when looking down. On the camera it sits exactly where
-	// it is put, in every direction.
-	Weapon->GetFirstPersonMesh()->AttachToComponent(FirstPersonCameraComponent, AttachmentRule);
-	Weapon->GetFirstPersonMesh()->SetRelativeLocationAndRotation(WeaponViewOffset, WeaponViewRotation);
-
-	// the world space body keeps its weapon on the hand socket
-	Weapon->GetThirdPersonMesh()->AttachToComponent(GetMesh(), AttachmentRule, WeaponSocket);
-
-	// The arms would be holding nothing, so they stay hidden. Visibility must not propagate:
-	// the camera is a child of this mesh, and the weapon hangs off the camera.
-	FirstPersonMesh->SetVisibility(false, false);
-}
-
-void AProjectTFCharacter::PlayFiringMontage(UAnimMontage* Montage)
-{
-	if (!Montage || !FirstPersonMesh)
-	{
-		return;
-	}
-
-	if (UAnimInstance* AnimInstance = FirstPersonMesh->GetAnimInstance())
-	{
-		AnimInstance->Montage_Play(Montage);
-	}
-}
-
-void AProjectTFCharacter::AddWeaponRecoil(float Recoil)
-{
-	// recoil is handled by UWeaponComponent, which knows the weapon data
-}
-
-void AProjectTFCharacter::UpdateWeaponHUD(int32 CurrentAmmo, int32 MagazineSize)
-{
-	// the HUD reads the ammo straight off UWeaponComponent
-}
-
-FVector AProjectTFCharacter::GetWeaponTargetLocation()
-{
-	const FVector Start = FirstPersonCameraComponent->GetComponentLocation();
-	return Start + FirstPersonCameraComponent->GetForwardVector() * 10000.0f;
-}
-
-void AProjectTFCharacter::AddWeaponClass(const TSubclassOf<AShooterWeapon>& WeaponClass)
-{
-	if (!WeaponClass || WeaponVisual)
-	{
-		return;
-	}
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this;
-	SpawnParams.Instigator = this;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	SpawnParams.TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot;
-
-	WeaponVisual = GetWorld()->SpawnActor<AShooterWeapon>(WeaponClass, GetActorTransform(), SpawnParams);
-
-	if (WeaponVisual)
-	{
-		WeaponVisual->ActivateWeapon(FName("Player"));
-	}
-}
-
-void AProjectTFCharacter::OnWeaponActivated(AShooterWeapon* Weapon)
-{
-	// the weapon knows which arm and body poses go with it
-	FirstPersonMesh->SetAnimInstanceClass(Weapon->GetFirstPersonAnimInstanceClass());
-	GetMesh()->SetAnimInstanceClass(Weapon->GetThirdPersonAnimInstanceClass());
-}
-
-void AProjectTFCharacter::OnWeaponDeactivated(AShooterWeapon* Weapon)
-{
-}
-
-void AProjectTFCharacter::OnSemiWeaponRefire()
-{
-}
 
 void AProjectTFCharacter::DoLean(float Direction)
 {

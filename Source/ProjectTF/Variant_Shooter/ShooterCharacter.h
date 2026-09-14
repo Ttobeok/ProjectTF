@@ -21,9 +21,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FDamagedDelegate, float, LifePercent
  *  Manages health and death
  */
 UCLASS(abstract)
-// the weapon holder interface is inherited from AProjectTFCharacter, which implements the
-// visual half of it for the CQB sample
-class PROJECTTF_API AShooterCharacter : public AProjectTFCharacter
+class PROJECTTF_API AShooterCharacter : public AProjectTFCharacter, public IShooterWeaponHolder
 {
 	GENERATED_BODY()
 	
