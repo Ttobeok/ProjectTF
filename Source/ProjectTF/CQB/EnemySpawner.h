@@ -6,7 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "EnemySpawner.generated.h"
 
-class AEnemyCharacter;
+class ACQBCharacter;
 class UArrowComponent;
 
 /**
@@ -27,9 +27,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Spawner")
 	void SpawnEnemies();
 
-	/** Class to spawn. Defaults to AEnemyCharacter, so no Blueprint is required. */
+	/** Class to spawn. Defaults to ACQBCharacter, so no Blueprint is required. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
-	TSubclassOf<AEnemyCharacter> EnemyClass;
+	TSubclassOf<ACQBCharacter> EnemyClass;
 
 	/** One enemy per entry, relative to this actor */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
@@ -65,5 +65,5 @@ protected:
 
 	/** Enemies spawned by this actor */
 	UPROPERTY()
-	TArray<TObjectPtr<AEnemyCharacter>> SpawnedEnemies;
+	TArray<TObjectPtr<ACQBCharacter>> SpawnedEnemies;
 };

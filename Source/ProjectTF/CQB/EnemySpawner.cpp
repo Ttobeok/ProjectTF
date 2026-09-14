@@ -1,6 +1,7 @@
 // CQB Sample - drops a group of enemies into the level.
 
 #include "EnemySpawner.h"
+#include "CQBCharacter.h"
 #include "EnemyCharacter.h"
 #include "HealthComponent.h"
 #include "Components/ArrowComponent.h"
@@ -141,7 +142,7 @@ void AEnemySpawner::DebugKillOneEnemy()
 		return;
 	}
 
-	for (const TObjectPtr<AEnemyCharacter>& Enemy : SpawnedEnemies)
+	for (const TObjectPtr<ACQBCharacter>& Enemy : SpawnedEnemies)
 	{
 		if (!IsValid(Enemy) || Enemy->IsDead())
 		{
@@ -197,7 +198,7 @@ void AEnemySpawner::SpawnEnemies()
 
 		const FTransform SpawnTransform(GetActorRotation(), SpawnLocation);
 
-		if (AEnemyCharacter* Enemy = World->SpawnActor<AEnemyCharacter>(EnemyClass, SpawnTransform, SpawnParams))
+		if (ACQBCharacter* Enemy = World->SpawnActor<ACQBCharacter>(EnemyClass, SpawnTransform, SpawnParams))
 		{
 			SpawnedEnemies.Add(Enemy);
 		}

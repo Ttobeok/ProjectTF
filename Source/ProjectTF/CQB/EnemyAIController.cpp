@@ -2,7 +2,7 @@
 
 #include "EnemyAIController.h"
 #include "CQBTypes.h"
-#include "EnemyCharacter.h"
+#include "CQBCharacter.h"
 #include "EngineUtils.h"
 #include "SquadManager.h"
 #include "WeaponComponent.h"
@@ -133,7 +133,7 @@ FGenericTeamId AEnemyAIController::GetGenericTeamId() const
 bool AEnemyAIController::IsHostile(const AActor* Actor) const
 {
 	// hands up means out of the fight; the squad stops shooting at them
-	if (const AEnemyCharacter* AsCharacter = Cast<const AEnemyCharacter>(Actor))
+	if (const ACQBCharacter* AsCharacter = Cast<const ACQBCharacter>(Actor))
 	{
 		if (AsCharacter->IsSurrendered())
 		{
@@ -937,9 +937,9 @@ float AEnemyAIController::EvaluateCompliance(const AActor* Challenger) const
 
 	// being alone is worse than having the squad around
 	int32 StandingMates = 0;
-	for (TActorIterator<AEnemyCharacter> It(GetWorld()); It; ++It)
+	for (TActorIterator<ACQBCharacter> It(GetWorld()); It; ++It)
 	{
-		const AEnemyCharacter* Other = *It;
+		const ACQBCharacter* Other = *It;
 		if (Other && Other != MyPawn && !Other->IsDead() && !Other->IsSurrendered()
 			&& FCQBFactions::GetFaction(Other) == Faction)
 		{
@@ -1019,7 +1019,7 @@ void AEnemyAIController::EnterSurrender()
 
 	bHasGoal = false;
 
-	if (AEnemyCharacter* MyCharacter = Cast<AEnemyCharacter>(GetPawn()))
+	if (ACQBCharacter* MyCharacter = Cast<ACQBCharacter>(GetPawn()))
 	{
 		MyCharacter->SetSurrendered(true);
 	}

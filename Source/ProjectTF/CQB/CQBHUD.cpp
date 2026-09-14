@@ -7,7 +7,7 @@
 #include "Engine/Engine.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
-#include "EnemyCharacter.h"
+#include "CQBCharacter.h"
 #include "DoorwayMarker.h"
 #include "AllyAIController.h"
 #include "ProjectTFCharacter.h"
@@ -253,9 +253,9 @@ void ACQBHUD::CQBKillEnemy(float DelaySeconds)
 
 void ACQBHUD::KillOneEnemy()
 {
-	for (TActorIterator<AEnemyCharacter> It(GetWorld()); It; ++It)
+	for (TActorIterator<ACQBCharacter> It(GetWorld()); It; ++It)
 	{
-		AEnemyCharacter* Enemy = *It;
+		ACQBCharacter* Enemy = *It;
 		if (!Enemy || Enemy->IsDead())
 		{
 			continue;

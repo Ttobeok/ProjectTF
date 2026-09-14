@@ -488,7 +488,7 @@ void AProjectTFCharacter::UpdateChallengeTarget()
 		return;
 	}
 
-	AEnemyCharacter* Suspect = Cast<AEnemyCharacter>(Hit.GetActor());
+	ACQBCharacter* Suspect = Cast<ACQBCharacter>(Hit.GetActor());
 	if (Suspect && !Suspect->IsDead() && !Suspect->IsSurrendered()
 		&& FCQBFactions::AreHostile(this, Suspect))
 	{
@@ -618,12 +618,12 @@ void AProjectTFCharacter::RunScriptedOrder()
 	else if (Order == TEXT("challenge"))
 	{
 		// shout at the nearest standing suspect, wherever the crosshair happens to be
-		AEnemyCharacter* Nearest = nullptr;
+		ACQBCharacter* Nearest = nullptr;
 		float NearestDistance = TNumericLimits<float>::Max();
 
-		for (TActorIterator<AEnemyCharacter> It(GetWorld()); It; ++It)
+		for (TActorIterator<ACQBCharacter> It(GetWorld()); It; ++It)
 		{
-			AEnemyCharacter* Suspect = *It;
+			ACQBCharacter* Suspect = *It;
 			if (!Suspect || Suspect->IsDead() || Suspect->IsSurrendered()
 				|| !FCQBFactions::AreHostile(this, Suspect))
 			{
