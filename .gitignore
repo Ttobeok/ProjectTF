@@ -1,0 +1,35 @@
+# Unreal Engine generated folders
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vs/
+.vscode/
+.idea/
+
+# Visual Studio / Rider project files
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.xcodeproj
+*.xcworkspace
+
+# Compiled binaries
+*.dll
+*.exe
+*.lib
+*.exp
+*.pdb
+*.obj
+
+# Packaged builds
+Packaged/
+Dist/
+
+# Content that should stay (do not ignore .uasset / .umap)
+!*.uasset
+!*.umap
