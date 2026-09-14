@@ -40,13 +40,22 @@ Behavior Tree / StateTree는 쓰지 않고, 직접 작성한 상태머신이 AI�
 입력은 **Input Action 에셋 없이도** 동작합니다 (`UInputComponent::BindKey` 직접 바인딩).
 캐릭터 BP의 `Input|CQB` 카테고리에 IA 에셋을 지정하면 해당 입력만 Enhanced Input 경로로 바뀝니다.
 
-### 디버그 명령
+### 디버그 훅
 
-| 명령 | 동작 |
+디버그는 전부 `ACQBDebugDirector` 한 액터에 모여 있고, 커맨드라인으로만 동작합니다.
+게임플레이 클래스에는 디버그 코드가 없습니다. 인자를 안 주면 이 액터는 아무 일도 하지 않습니다.
+
+| 인자 | 동작 |
 |---|---|
-| `CQBKillEnemy <초>` | N초 뒤 적 1명 사살 — "Man down!" + 역할 재배정 확인 |
-| `CQBMovePlayer <X> <Y> <초>` | N초 뒤 플레이어 순간이동 — "Lost visual" 확인 |
-| `ProjectTF.exe -CQBKillEnemyAfter=12` | 커맨드라인 버전 (헤드리스 검증용) |
+| `-CQBPlayerAt=X,Y,Z` | 플레이어를 그 자리에서 시작 (PlayerStart는 그대로) |
+| `-CQBKillEnemyAfter=<초>` | N초 뒤 타격 — "Man down!" + 역할 재배정 확인 |
+| `-CQBKillCount=<수>` `-CQBKillDamage=<비율>` | 몇 명을, 얼마나. 0.7이면 죽이지 않고 70%만 |
+| `-CQBOrderAfter=<초>` `-CQBOrder=<이름>` `-CQBOrderDoor=<n>` | 분대 명령 / 외침 |
+| `-CQBScreenshotAfter=<초>` | 스크린샷 |
+
+```bash
+ProjectTF.exe -game -nullrhi -unattended -stdout -CQBPlayerAt=200,80,120 -CQBKillEnemyAfter=8
+```
 
 ---
 
@@ -90,7 +99,7 @@ CQB 스케일(방 8m, 복도 2m, 엄폐물 110~120cm).
 | 개구부 폭 | 200 (2m) |
 | 엄폐물 | 높이 110~120 큐브 5개 |
 | PlayerStart | (-1200, -250, 100) |
-| EnemySpawner | (600, 0, 20) — 적 3명이 엄폐물 옆에 전개 |
+| EnemySpawner | (600, 0, 20) — `ACQBSpawner`, 적 3명이 엄폐물 옆에 전개 |
 
 레벨 재생성:
 ```bash
@@ -123,12 +132,17 @@ Source/ProjectTF/
     │                             반동(컨트롤러 회전 가산 + 자동 회복), FOV 보간,
     │                             발사 시 UAISense_Hearing 노이즈 이벤트
     ├── ACQBHUD                   (AHUD) 캔버스 크로스헤어 + HP/탄약 + 디버그 명령
-    ├── AEnemyCharacter           (ACharacter) 플레이어와 같은 Health/Weapon 컴포넌트 재사용
-    │                             ABP_TP_Rifle 애님 + 라이플 메시, 사망 시 래그돌 → 6초 후 Destroy
+    ├── ACQBCharacter             (ACharacter) AI 폰의 공통 몸. 플레이어와 같은 Health/Weapon
+    │                             컴포넌트 재사용, 사망 시 래그돌 → 6초 후 Destroy
+    │                             진영은 Neutral — 어느 편인지는 하위 클래스가 정함
+    │   ├── AEnemyCharacter       Faction = Enemy,  AIController = AEnemyAIController
+    │   └── AAllyCharacter        Faction = Ally,   AIController = AAllyAIController
     ├── AEnemyAIController        (AAIController) 상태머신 + AIPerception(Sight/Hearing)
     │                             EQS 또는 NavMesh 샘플링으로 엄폐 지점 탐색
     ├── ASquadManager             (AActor, 월드 1개) 역할 배분 / 측면 지점 / 콜아웃 중계
-    ├── AEnemySpawner             (AActor) 적 N명 배치 + 시작 시 NavMesh 확인
+    ├── ACQBSpawner               (AActor) CharacterClass를 N개 배치 + 시작 시 NavMesh 확인
+    │                             레벨에 2개 (적 3명 / 아군 4명). 어느 편인지는 모름
+    ├── ACQBDebugDirector         (AActor, 런타임 자동 생성) 커맨드라인 디버그 훅 전부
     └── UEnvQueryContext_CQBPlayer EQS에서 플레이어를 가리키는 컨텍스트
 ```
 
@@ -240,7 +254,7 @@ CQB: Enemy_2  Suppress -> Investigate
 
 **아군 사망 + 역할 재배정**
 ```
-CQB debug: killing EnemyCharacter_0
+CQB debug: hitting EnemyCharacter_0
 CQB callout: [Enemy_1] Man down!
 CQB: Enemy_2  Suppress -> Engage           역할 반납 후 재요청
 ```
@@ -268,8 +282,9 @@ CQB: Enemy_2  Suppress -> Engage           역할 반납 후 재요청
 | 플레이어 무기 | Damage 20 / FireRate 8 / Mag 30 / Reload 1.8s | `UWeaponData` |
 | ADS / Hip FOV | 55 / 90 | `UWeaponData` |
 | 반동 | Pitch 0.25~0.7, Yaw ±0.25, 회복 6°/s | `UWeaponData` |
-| 적 체력 | 60 | `AEnemyCharacter::EnemyMaxHealth` |
-| 적 무기 | Damage 7 / FireRate 2.5 / 탄퍼짐 4° | `AEnemyCharacter::Enemy*` |
+| 적 체력 | 60 | `ACQBCharacter::MaxHealth` |
+| 적 무기 | Damage 7 / FireRate 2.5 / 탄퍼짐 4° | `ACQBCharacter::Weapon*` |
+| 항복 임계·가중치 | 1.0 / 거리 0.5 / 고립 0.4 / 시야없음 -0.3 | `AEnemyAIController::Compliance*` |
 | 시야 / 청각 | 반경 2000·각도 70 / 3000 | `AEnemyAIController` |
 | 시야 상실 유예 | 3초 | `LoseSightGraceTime` |
 | 제압 사격 주기 | 2초 사격 / 1초 휴식 | `SuppressFire/RestDuration` |

@@ -15,10 +15,16 @@
 | 2 | `HealthComponent.h/.cpp` | 147 | 가장 단순. 컴포넌트 패턴 감 잡기 |
 | 3 | `WeaponData.h` | 101 | 무기 수치 전부. 주석에 단위까지 |
 | 4 | `WeaponComponent.cpp` | 426 | 사격 파이프라인. `Fire()` 하나면 절반 |
-| 5 | `EnemyAIController.h` | 297 | 상태머신 구조. 헤더만 봐도 설계가 보임 |
-| 6 | `EnemyAIController.cpp` | 888 | 전투 본체 |
-| 7 | `AllyAIController.cpp` | 323 | 6번을 상속해 명령 4개를 얹은 것 |
-| 8 | `SquadManager.cpp` | 222 | 적 분대의 역할 배분·콜아웃 |
+| 5 | `EnemyAIController.h` | 340 | 상태머신 구조. 헤더만 봐도 설계가 보임 |
+| 6 | `EnemyAIController.cpp` | 399 | 상태머신 본체 — 감각이 들어가고 상태가 나옴 |
+| 7 | `EnemyAIController_States.cpp` | 266 | 상태 7개의 Enter/Update/Exit |
+| 8 | `EnemyAIController_Actions.cpp` | 237 | 상태가 시키는 일 — 사격·조준·이동·엄폐 탐색 |
+| 9 | `EnemyAIController_Squad.cpp` | 173 | 콜아웃 수신, 역할 재배정, 항복 판정 |
+| 10 | `AllyAIController.cpp` | 388 | 6~9번을 상속해 명령 5개를 얹은 것 |
+| 11 | `SquadManager.cpp` | 222 | 적 분대의 역할 배분·콜아웃 |
+
+`AEnemyAIController`는 파일 4개로 나뉘어 있습니다. 클래스는 하나고, 경계는 역할별입니다:
+**머신 본체 / 상태 / 동작 / 분대**. 상태 하나를 고치러 왔다면 `_States.cpp`만 열면 됩니다.
 
 ---
 
@@ -36,16 +42,23 @@
                     │  Follow/Hold/Stack/Clear │  (Faction = Ally)
                     └──────────────────────────┘
 
-  AEnemyCharacter ──┬── UHealthComponent      플레이어와 공용
-                    ├── UWeaponComponent      플레이어와 공용
-                    ├── UWeaponVisualComponent
-                    └── UNavigationInvokerComponent
-        ▲
-        │ 상속 (Faction만 Ally)
-   AAllyCharacter
+   ACQBCharacter ───┬── UHealthComponent      플레이어와 공용
+    (Faction=Neutral)├── UWeaponComponent      플레이어와 공용
+        ▲            ├── UWeaponVisualComponent
+        │            └── UNavigationInvokerComponent
+        │
+        ├── AEnemyCharacter   Faction = Enemy,  AIController = AEnemyAIController
+        └── AAllyCharacter    Faction = Ally,   AIController = AAllyAIController
 ```
 
 **같은 컴포넌트, 같은 상태머신, 진영만 다름.** 이게 설계의 전부입니다.
+
+두 하위 클래스는 각각 열 줄 남짓입니다. 몸(컴포넌트·체력·사망 래그돌·피격 판정)은 전부
+`ACQBCharacter`에 있고, 하위 클래스는 **어느 편인지와 어느 뇌를 쓸지만** 정합니다.
+아군을 적 클래스에서 상속시키지 않은 이유가 이것입니다 — 아군은 적이 아닙니다.
+
+레벨에 놓이는 스포너는 `ACQBSpawner` 하나고, `CharacterClass`에 무엇을 넣느냐로 편이 갈립니다.
+적 스포너는 `AEnemyCharacter`, 아군 스포너는 `AAllyCharacter`.
 
 ---
 
@@ -187,13 +200,23 @@ AI가 그 자리에서 판단합니다 — `AEnemyAIController::ReceiveChallenge
 
 ### 실측 (헤드리스 3회)
 
+같은 자리(방 B 문 앞 230 거리)에서 부상 정도만 바꿔 외친 결과입니다.
+아래 명령 그대로 재현됩니다.
+
 ```
-만체력 / 동료 생존 / 1689 거리   →  0.35 / 1.00   "Not a chance!"
-만체력 / 고립 / 675 거리         →  0.97 / 1.00   거부 (간발의 차)
-30% 체력 / 고립 / 307 거리       →  1.22 / 1.00   "Hands up, I give up!"
+만체력        →  0.68 / 1.00   "Not a chance!"       거부
+30% 체력      →  1.15 / 1.00   "Hands up!"           Cover -> Surrender
+15% 체력      →  1.37 / 1.00   "Hands up!"           Suppress -> Surrender
 ```
 
-**동전 던지기가 아니라 상황을 읽습니다.** 0.97로 버티는 케이스가 이 시스템의 값어치입니다.
+```bash
+for D in 0.0 0.7 0.85; do
+  ProjectTF.exe ... -CQBPlayerAt=200,80,120     -CQBKillEnemyAfter=3 -CQBKillCount=3 -CQBKillDamage=$D     -CQBOrderAfter=6 -CQBOrder=challenge
+done
+```
+
+**동전 던지기가 아니라 상황을 읽습니다.** 0.68로 버티는 케이스가 이 시스템의 값어치입니다.
+같은 부상이라도 멀리서 외치면 안 넘어갑니다 — 거리 항이 0.5까지 먹기 때문입니다.
 
 ### 항복 후
 
@@ -292,19 +315,34 @@ GetClearPoint()             문 너머 450cm
 
 ## 11. 직접 돌려볼 때
 
+디버그 훅은 전부 `ACQBDebugDirector` 한 곳에 있습니다. 게임플레이 클래스에는 없습니다.
+이 액터는 레벨에 놓여 있지 않고 스포너가 `EnsureExists()`로 띄웁니다 — 아무 인자도 안 주면
+아무 일도 하지 않습니다.
+
+| 인자 | 뜻 |
+|---|---|
+| `-CQBPlayerAt=X,Y,Z` | 시작 후 0.5초에 플레이어를 그 자리로. PlayerStart를 안 건드리고 테스트 |
+| `-CQBKillEnemyAfter=<초>` | N초 뒤 용의자 타격 |
+| `-CQBKillCount=<수>` | 몇 명. 플레이어에서 가까운 순. 기본 1 |
+| `-CQBKillDamage=<비율>` | 최대 체력 대비. 기본 10.0(즉사), 0.7이면 70%만 |
+| `-CQBOrderAfter=<초>` | N초 뒤 분대 명령 |
+| `-CQBOrder=<이름>` | follow / hold / stack / clear / watch / challenge |
+| `-CQBOrderDoor=<n>` | 0=방 A 문, 1=방 B 문 (서→동 순) |
+| `-CQBScreenshotAfter=<초>` | N초 뒤 스크린샷 |
+
 ```bash
 # AI 전체 시퀀스 (로그만)
 ProjectTF.exe -game -nullrhi -unattended -stdout
 
-# 아군 사망 → 역할 재배정
-ProjectTF.exe ... -CQBKillEnemyAfter=10
+# 적 교전 → 역할 배분 → 측면 → 사망 → 재배정 한 번에
+ProjectTF.exe ... -CQBPlayerAt=200,80,120 -CQBKillEnemyAfter=8
 
-# 분대 명령 (0=방A 문, 1=방B 문). stack / clear / watch / hold / follow / challenge
-ProjectTF.exe ... -CQBOrder=stack -CQBOrderAfter=8 -CQBOrderDoor=1
-ProjectTF.exe ... -CQBOrder=clear -CQBOrderAfter=8 -CQBOrderDoor=0
+# 분대 명령
+ProjectTF.exe ... -CQBOrder=stack -CQBOrderAfter=5 -CQBOrderDoor=1
+ProjectTF.exe ... -CQBOrder=clear -CQBOrderAfter=5 -CQBOrderDoor=1
 
-# 항복 검증: 3명을 70% 깎고 9초 뒤 가장 가까운 용의자에게 외침
-ProjectTF.exe ... -CQBKillEnemyAfter=5 -CQBKillCount=3 -CQBKillDamage=0.7                   -CQBOrder=challenge -CQBOrderAfter=9
+# 항복
+ProjectTF.exe ... -CQBPlayerAt=200,80,120   -CQBKillEnemyAfter=3 -CQBKillCount=3 -CQBKillDamage=0.7   -CQBOrderAfter=6 -CQBOrder=challenge
 
 # 스크린샷
 ProjectTF.exe -game -windowed -CQBScreenshotAfter=5
@@ -314,6 +352,8 @@ log LogProjectTF Verbose
 ```
 
 로그에서 `CQB` 로 시작하는 줄만 보면 전부 추적됩니다.
+헤드리스 실행은 맵 로딩에만 15초 가까이 걸립니다. `-CQBOrderAfter` 값과 별개로
+프로세스를 30초 이상 살려두어야 훅이 실제로 발화합니다.
 
 ---
 
@@ -332,9 +372,10 @@ Enemy_3  Engage -> Cover -> Suppress   3번째 = Suppressor
 
 **항복**
 ```
-CQB debug: challenging EnemyCharacter_0 at 307
-Enemy_1  Suppress -> Surrender
-[Enemy_1] Hands up, I give up!     surrendered (1.22 of 1.00)
+CQB debug: player placed at V(X=200.00, Y=80.00, Z=120.00)
+CQB debug: scripted order 'challenge' on Room A
+Enemy_1  Cover -> Surrender
+Enemy_1 surrendered (1.15 of 1.00)
 ```
 
 **아군 명령**
@@ -342,8 +383,11 @@ Enemy_1  Suppress -> Surrender
 scripted order 'stack' on Room B
 RED_1/2, BLU_1/2  Follow -> Stack   →  전원 In position
 
-scripted order 'clear' on Room A
-Ally_1/2  Follow -> Clear   →  [Ally_1] Room clear!  →  Clear -> Follow
+scripted order 'clear' on Room B
+RED_1/2, BLU_1/2  Follow -> Clear
+[RED_1] Contact! → Engage → Cover → Suppress      전투가 명령을 가로챔
+[BLU_1] Room clear! → Clear -> Follow             나머지는 방을 비우고 복귀
+RED_1  Suppress -> Clear                          교전 끝나면 명령으로 되돌아감
 
 scripted order 'watch' on Room B
 RED_1/2, BLU_1/2  Follow -> Watch   →  전원 "Watching that"
@@ -374,11 +418,12 @@ RED_1/2, BLU_1/2  Follow -> Watch   →  전원 "Watching that"
 |---|---|---|
 | 무기 수치 | `UWeaponData` 에셋 → 캐릭터 BP의 Weapon Component | 없음 |
 | 적 체력·무기 | `BP_Enemy` (AEnemyCharacter 상속) | 없음 |
+| 순응 가중치 (항복 난이도) | `BP_EnemyAIController`의 Compliance* 6개 | 없음 |
 | AI 인지·전투 타이밍 | `BP_EnemyAIController` | 없음 |
 | 아군 명령 거리·시간 | `BP_AllyAIController` (AAllyAIController 상속) | 없음 |
 | 분대 측면거리·콜아웃 | 레벨에 배치한 `SquadManager` | 없음 |
 | 문 위치·스택 지점 | 레벨의 `DoorwayMarker` (`bDrawDebug`로 확인) | 없음 |
-| 적/아군 수·위치 | 레벨의 `EnemySpawner` / `AllySpawner` | 없음 |
+| 적/아군 수·위치 | 레벨의 `EnemySpawner` / `AllySpawner` (둘 다 `ACQBSpawner`) | 없음 |
 | 레벨 형태 | `Scripts/BuildCQBLevel.py` | 없음 (레벨 재생성) |
 | 전이 규칙·역할 배분 | `CQB/*.cpp` | **필요** |
 
@@ -390,15 +435,18 @@ RED_1/2, BLU_1/2  Follow -> Watch   →  전원 "Watching that"
 Blueprint Class → AEnemyAIController  → BP_EnemyAIController
 Blueprint Class → AEnemyCharacter     → BP_Enemy
   Class Defaults → AI Controller Class = BP_EnemyAIController
-레벨의 EnemySpawner → Enemy Class = BP_Enemy
+레벨의 EnemySpawner → Character Class = BP_Enemy
 ```
 
 아군도 같은 방식 (`AAllyAIController` / `AAllyCharacter`).
 
-### 알아둘 것 2개
+### 알아둘 것 3개
 
 - **`SquadManager`는 없으면 런타임 자동 생성**됩니다. 값을 만지려면 레벨에 직접 배치해야 합니다.
-- **`AllySpawner`는 `AEnemySpawner` 클래스를 재사용**합니다. 프로퍼티 이름이 `EnemyClass`인 건 그 때문입니다.
+- **스포너는 `ACQBSpawner` 하나**입니다. 레벨에 두 개 놓여 있고 이름만 EnemySpawner /
+  AllySpawner이며, 차이는 `CharacterClass` 뿐입니다. 스포너는 어느 편을 채우는지 모릅니다.
+- **`ACQBDebugDirector`도 런타임 자동 생성**입니다. 커맨드라인 인자가 없으면 아무것도 안 합니다.
+  디버그 코드를 게임플레이 클래스에서 찾지 마세요 — 전부 여기 있습니다.
 
 ---
 
@@ -407,5 +455,6 @@ Blueprint Class → AEnemyCharacter     → BP_Enemy
 - **BP 확장 훅 없음** (`BlueprintImplementableEvent` 0개) — 사운드·머즐 플래시를 BP에서 붙일 자리가 없습니다.
   붙인다면 `OnStateChanged` / `OnCalloutSpoken` / `OnWeaponFired` / `OnEnemyDied`.
 - **적 프로파일 DataAsset 없음** — AI 수치 12개가 컨트롤러에 흩어져 있어 성격을 바꾸려면 BP 복제가 필요합니다.
-- **`EnemyAIController.cpp`가 888줄** — 함수는 다 짧지만, 1,200줄을 넘기면 전투/인지/이동으로 나누는 게 맞습니다.
-- **`AEnemySpawner`가 일을 3개** — 스폰 + 네비 확인 + 디버그 훅.
+- **적 프로파일을 BP 없이 못 바꿈** — 위 표대로 BP 껍데기를 한 번 만들어야 인스펙터가 열립니다.
+- **애니메이션이 템플릿 그대로** — 사격·피격·항복 자세가 전용 몽타주가 아니라 캡슐 높이 조절과
+  무기 숨김으로 표현됩니다. 로직은 맞고 보이는 것만 임시입니다.
