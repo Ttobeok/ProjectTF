@@ -5,6 +5,9 @@
 #include "Components/ArrowComponent.h"
 #include "Engine/World.h"
 #include "NavigationSystem.h"
+#include "NavMesh/RecastNavMesh.h"
+#include "NavMesh/NavMeshBoundsVolume.h"
+#include "EngineUtils.h"
 #include "ProjectTF.h"
 
 AEnemySpawner::AEnemySpawner()
@@ -28,10 +31,55 @@ void AEnemySpawner::BeginPlay()
 {
 	Super::BeginPlay();
 
+	EnsureNavigationBuilt();
+
 	if (bSpawnOnBeginPlay)
 	{
 		SpawnEnemies();
 	}
+}
+
+void AEnemySpawner::EnsureNavigationBuilt()
+{
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (!NavSys)
+	{
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: no navigation system, the AI will not move"));
+		return;
+	}
+
+	// A level that was opened and saved in the editor without running Build Paths carries a
+	// RecastNavMesh actor holding no tiles. The navigation system treats that as valid data and
+	// skips generation, so every AI move request fails and the enemies stand still. Detect that
+	// by projecting a point we know is on the floor, and kick off a build when it comes back empty.
+	FNavLocation Projected;
+	if (NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(300.0f, 300.0f, 500.0f)))
+	{
+		return;
+	}
+
+	UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: no navmesh under the spawner, rebuilding at runtime"));
+
+	// Report what the navmesh is set to. Static generation builds no generator at all, so
+	// RebuildAll and Build() silently do nothing; the level must not ship an empty Static navmesh.
+	for (const ANavigationData* NavData : NavSys->NavDataSet)
+	{
+		if (const ARecastNavMesh* Recast = Cast<ARecastNavMesh>(NavData))
+		{
+			UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: %s RuntimeGeneration=%d"),
+				*Recast->GetName(), static_cast<int32>(Recast->GetRuntimeGenerationMode()));
+		}
+	}
+
+	// The navmesh is spawned during world init, which can happen before the bounds volumes
+	// register, leaving the tile generator holding an empty set of bounds. Re-announcing the
+	// volumes refreshes it and marks the tiles dirty so the build below has something to do.
+	for (TActorIterator<ANavMeshBoundsVolume> It(GetWorld()); It; ++It)
+	{
+		NavSys->OnNavigationBoundsUpdated(*It);
+	}
+
+	NavSys->Build();
 }
 
 void AEnemySpawner::SpawnEnemies()
@@ -74,4 +122,6 @@ void AEnemySpawner::SpawnEnemies()
 	}
 
 	UE_LOG(LogProjectTF, Log, TEXT("CQB: spawned %d enemies"), SpawnedEnemies.Num());
+
 }
+

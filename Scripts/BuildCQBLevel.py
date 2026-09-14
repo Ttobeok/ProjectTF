@@ -255,6 +255,27 @@ def build_nav_bounds(center, extent):
     return volume
 
 
+
+def configure_navmesh():
+    """
+    Drop the RecastNavMesh actor the editor creates for the bounds volume.
+
+    That actor is saved holding no tile data, because nothing ever ran Build Paths on it, and
+    it is saved on Static generation, which means no generator is ever constructed. The
+    navigation system then sees existing nav data, skips generation, and every AI move request
+    fails silently. With no navmesh actor in the level the runtime spawns one itself and
+    rebuilds it on load, which takes a fraction of a second on a level this size.
+    """
+    removed = 0
+    for actor in editor_actor.get_all_level_actors():
+        if actor.get_class().get_name() == "RecastNavMesh":
+            editor_actor.destroy_actor(actor)
+            removed += 1
+
+    unreal.log("NAVMESH removed empty RecastNavMesh actors: %d" % removed)
+    return removed > 0
+
+
 def main():
     unreal.log("=== building " + LEVEL_PATH + " ===")
 
@@ -279,10 +300,22 @@ def main():
     except Exception as error:
         unreal.log_error("nav bounds failed: " + str(error))
 
-    if unreal.EditorLoadingAndSavingUtils.save_map(world, LEVEL_PATH):
-        unreal.log("=== saved " + LEVEL_PATH + " ===")
-    else:
+    try:
+        configure_navmesh()
+    except Exception as error:
+        unreal.log_error("navmesh config failed: " + str(error))
+
+    if not unreal.EditorLoadingAndSavingUtils.save_map(world, LEVEL_PATH):
         unreal.log_error("=== failed to save " + LEVEL_PATH + " ===")
+        return
+
+    # The navigation system only creates the RecastNavMesh actor once the level is loaded,
+    # so reopen the level we just wrote and configure it there before saving again.
+    reloaded = unreal.EditorLoadingAndSavingUtils.load_map(LEVEL_PATH)
+    if reloaded and configure_navmesh():
+        unreal.EditorLoadingAndSavingUtils.save_map(reloaded, LEVEL_PATH)
+
+    unreal.log("=== saved " + LEVEL_PATH + " ===")
 
 
 main()

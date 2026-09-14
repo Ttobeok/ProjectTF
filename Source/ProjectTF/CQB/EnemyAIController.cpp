@@ -646,7 +646,15 @@ void AEnemyAIController::MoveToPoint(const FVector& Goal)
 	CurrentGoal = Goal;
 	bHasGoal = true;
 
-	MoveToLocation(Goal, 60.0f, true, true, true, true);
+	const EPathFollowingRequestResult::Type Result = MoveToLocation(Goal, 60.0f, true, true, true, true);
+
+	// a failed request almost always means there is no NavMesh under the goal, which quietly
+	// turns every state that moves into a no-op, so say so loudly instead
+	if (Result == EPathFollowingRequestResult::Failed)
+	{
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB: %s could not path to %s. Is the NavMesh built?"),
+			*DisplayName, *Goal.ToCompactString());
+	}
 }
 
 bool AEnemyAIController::HasReachedGoal(float Tolerance) const

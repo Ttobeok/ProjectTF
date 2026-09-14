@@ -42,6 +42,9 @@ protected:
 
 	virtual void BeginPlay() override;
 
+	/** Rebuilds the navmesh at startup when the level carries an empty one */
+	void EnsureNavigationBuilt();
+
 	/** Editor only arrow so the spawner can be found in the viewport */
 	UPROPERTY(VisibleAnywhere, Category = "Spawner")
 	UArrowComponent* ArrowComponent;

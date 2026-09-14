@@ -11,6 +11,7 @@
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
 #include "Perception/AISense_Hearing.h"
+#include "Kismet/GameplayStatics.h"
 
 namespace
 {
@@ -216,7 +217,11 @@ void UWeaponComponent::Fire()
 				InstigatorController = OwnerPawn->GetController();
 			}
 
-			const float DamageDealt = TargetHealth->TakeDamage(Data->Damage, Owner, InstigatorController);
+			// go through the engine damage pipeline rather than poking the health component
+			// directly, so god mode, damage types and immunity all keep working.
+			// UHealthComponent listens to OnTakeAnyDamage and applies the result.
+			const float DamageDealt = UGameplayStatics::ApplyPointDamage(
+				HitActor, Data->Damage, ShotDirection, Hit, InstigatorController, Owner, nullptr);
 
 			DebugMessage(SlotHit, FColor::Red, FString::Printf(TEXT("[%s] HIT %s  -%.0f  (%.0f HP left)"),
 				*Owner->GetName(), *HitActor->GetName(), DamageDealt, TargetHealth->CurrentHealth));
