@@ -13,6 +13,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
+#include "ProjectTF.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 
@@ -92,6 +93,13 @@ void ACQBCharacter::BeginPlay()
 	if (UClass* BodyAnim = BodyAnimAsset.LoadSynchronous())
 	{
 		GetMesh()->SetAnimInstanceClass(BodyAnim);
+	}
+	else
+	{
+		// a packaged build reaches here when the asset was not cooked - see the
+		// DirectoriesToAlwaysCook entries in DefaultGame.ini
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB: body animation %s could not be loaded, the pawn will not animate"),
+			*BodyAnimAsset.ToString());
 	}
 }
 
