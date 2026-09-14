@@ -14,6 +14,11 @@ Behavior Tree / StateTree는 쓰지 않고, 직접 작성한 상태머신이 AI�
 
 압축 해제 후 `Windows/ProjectTF.exe` 실행. 설치 불필요.
 
+![패키지 실행 화면](Docs/packaged_verification.png)
+
+위는 패키지를 실제로 띄워서 찍은 것입니다. 적 머리 위 `Enemy_1 [Suppress] Suppressor LOS`,
+좌상단 콜아웃과 피격 표시, 노란 사격선, 좌하단 분대 명부가 전부 이 빌드에서 나온 그대로입니다.
+
 > Shipping이 아니라 **Development** 빌드입니다. Shipping은 `DrawDebug*`와 화면 디버그 텍스트가
 > 컴파일 단계에서 제거돼서, 이 샘플의 핵심인 적 상태 표시와 콜아웃이 전혀 보이지 않습니다.
 
