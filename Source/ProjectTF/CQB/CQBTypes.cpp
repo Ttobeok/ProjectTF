@@ -12,15 +12,17 @@ ECQBFaction FCQBFactions::GetFaction(const AActor* Actor)
 		return ECQBFaction::Neutral;
 	}
 
-	if (const ICQBFactionAgent* Agent = Cast<const ICQBFactionAgent>(Actor))
+	AActor* Mutable = const_cast<AActor*>(Actor);
+
+	if (const ICQBFactionAgent* Agent = Cast<ICQBFactionAgent>(Mutable))
 	{
 		return Agent->GetFaction();
 	}
 
 	// a controller can answer for its pawn and the other way round
-	if (const APawn* AsPawn = Cast<const APawn>(Actor))
+	if (APawn* AsPawn = Cast<APawn>(Mutable))
 	{
-		if (const ICQBFactionAgent* ControllerAgent = Cast<const ICQBFactionAgent>(AsPawn->GetController()))
+		if (const ICQBFactionAgent* ControllerAgent = Cast<ICQBFactionAgent>(AsPawn->GetController()))
 		{
 			return ControllerAgent->GetFaction();
 		}

@@ -2,7 +2,6 @@
 
 #include "DoorwayMarker.h"
 #include "Components/ArrowComponent.h"
-#include "Components/BoxComponent.h"
 #include "DrawDebugHelpers.h"
 
 ADoorwayMarker::ADoorwayMarker()
@@ -14,16 +13,6 @@ ADoorwayMarker::ADoorwayMarker()
 	EntryArrow->ArrowColor = FColor::Cyan;
 	EntryArrow->ArrowSize = 2.5f;
 
-	// The player aims at the doorway to give orders, so it needs something to trace against.
-	// Visibility only: it must not get in the way of bullets or of anyone walking through.
-	AimTarget = CreateDefaultSubobject<UBoxComponent>(TEXT("Aim Target"));
-	AimTarget->SetupAttachment(EntryArrow);
-	AimTarget->SetBoxExtent(FVector(20.0f, 100.0f, 110.0f));
-	AimTarget->SetRelativeLocation(FVector(0.0f, 0.0f, 110.0f));
-	AimTarget->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	AimTarget->SetCollisionResponseToAllChannels(ECR_Ignore);
-	AimTarget->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	AimTarget->SetHiddenInGame(true);
 }
 
 FVector ADoorwayMarker::GetStackPoint(EStackSide Side) const

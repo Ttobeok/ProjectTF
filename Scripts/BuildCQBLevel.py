@@ -97,9 +97,16 @@ def build_region(prefix, min_x, max_x, min_y, max_y, walls, floor=True, floor_dr
     if ceiling:
         # Rooms read as interiors rather than open pits, and it keeps the AI debug text from
         # being lost against the sky. Sits just above the walls.
-        spawn_box(prefix + "_Ceiling",
-                  (min_x + max_x) * 0.5, (min_y + max_y) * 0.5, WALL_HEIGHT + FLOOR_THICKNESS * 0.5 + floor_drop,
-                  (max_x - min_x) + t * 2, (max_y - min_y) + t * 2, FLOOR_THICKNESS)
+        ceiling = spawn_box(prefix + "_Ceiling",
+                            (min_x + max_x) * 0.5, (min_y + max_y) * 0.5,
+                            WALL_HEIGHT + FLOOR_THICKNESS * 0.5 + floor_drop,
+                            (max_x - min_x) + t * 2, (max_y - min_y) + t * 2, FLOOR_THICKNESS)
+
+        # A ceiling is a walkable surface as far as Recast is concerned, and one stacked over
+        # every room is enough to stop the navmesh generating at all. It is only there to look
+        # like an interior, so keep it out of navigation entirely.
+        if ceiling:
+            ceiling.static_mesh_component.set_editor_property("can_ever_affect_navigation", False)
 
     for side, holes in walls.items():
         if side in ("N", "S"):
@@ -337,23 +344,25 @@ def build_nav_bounds(center, extent):
 
 def configure_navmesh():
     """
-    Switch the level navmesh to dynamic generation.
+    Remove the RecastNavMesh actor the editor creates for the bounds volume.
 
-    The editor creates a RecastNavMesh actor for the bounds volume and saves it with no tile
-    data, because nothing ever ran Build Paths on it. Keeping the actor matters: the navigation
-    system decides at world init whether to keep a geometry octree at all, and it only does so
-    when nav data that supports rebuilding already exists. Dynamic generation gives it both.
+    That actor is saved holding no tile data, because nothing ever runs Build Paths on it in a
+    commandlet. A saved but empty navmesh is worse than none at all: the navigation system sees
+    existing nav data and skips generation, so the level ships with no navmesh and every AI move
+    order fails. With no actor in the level the runtime spawns one itself and builds it around
+    the navigation invokers, which takes about a second.
+
+    Setting the actor to dynamic generation instead is not enough - it was tried, and the tiles
+    still never appear.
     """
+    removed = 0
     for actor in editor_actor.get_all_level_actors():
-        if actor.get_class().get_name() != "RecastNavMesh":
-            continue
+        if actor.get_class().get_name() == "RecastNavMesh":
+            editor_actor.destroy_actor(actor)
+            removed += 1
 
-        actor.set_editor_property("runtime_generation", unreal.RuntimeGenerationType.DYNAMIC)
-        unreal.log("NAVMESH runtime_generation=" + str(actor.get_editor_property("runtime_generation")))
-        return actor
-
-    unreal.log_warning("NAVMESH no RecastNavMesh actor found")
-    return None
+    unreal.log("NAVMESH removed empty RecastNavMesh actors: %d" % removed)
+    return removed > 0
 
 
 def main():

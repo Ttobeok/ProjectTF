@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
+#include "NavigationSystem.h"
 #include "ProjectTF.h"
 
 AAllyAIController::AAllyAIController()
@@ -201,13 +202,29 @@ void AAllyAIController::UpdateFollow(float DeltaTime)
 		return;
 	}
 
-	// stand off behind the player rather than on top of them
-	const FVector Behind = Leader->GetActorLocation() - Leader->GetActorForwardVector() * FollowDistance;
+	// Stand off behind the player rather than on top of them. Indoors that point is often
+	// inside a wall - a player with their back to one puts it straight through - so it is
+	// pulled onto the navmesh, and failing that the squad just closes on the player.
+	const FVector Desired = Leader->GetActorLocation() - Leader->GetActorForwardVector() * FollowDistance;
+	FVector Goal = Leader->GetActorLocation();
+
+	if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
+	{
+		FNavLocation Projected;
+		if (NavSys->ProjectPointToNavigation(Desired, Projected, FVector(FollowDistance, FollowDistance, 300.0f)))
+		{
+			Goal = Projected.Location;
+		}
+	}
+	else
+	{
+		Goal = Desired;
+	}
 
 	// only re-path once the player has actually moved somewhere else
-	if (!bHasGoal || FVector::Dist2D(Behind, CurrentGoal) > FollowRepathDistance)
+	if (!bHasGoal || FVector::Dist2D(Goal, CurrentGoal) > FollowRepathDistance)
 	{
-		MoveToPoint(Behind);
+		MoveToPoint(Goal);
 	}
 }
 

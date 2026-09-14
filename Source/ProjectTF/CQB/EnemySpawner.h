@@ -51,6 +51,11 @@ protected:
 	/** Debug helper driven by -CQBScreenshotAfter=<seconds>, used to eyeball the HUD and weapons */
 	void DebugTakeScreenshot();
 
+	/** Reports whether the navmesh turned up, a few seconds after the level loads */
+	void ReportNavigationState();
+
+	FTimerHandle NavReportTimer;
+
 	FTimerHandle DebugKillTimerHandle;
 	FTimerHandle DebugScreenshotTimerHandle;
 

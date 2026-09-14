@@ -63,6 +63,15 @@ public:
 	virtual ECQBFaction GetFaction() const override { return Faction; }
 	//~End ICQBFactionAgent
 
+	/**
+	 *  Team id derived from the faction.
+	 *
+	 *  The sight sense filters what it reports by team attitude, so leaving every controller on
+	 *  the default team makes cross side detection unreliable. Player and allies share a team,
+	 *  enemies get their own.
+	 */
+	virtual FGenericTeamId GetGenericTeamId() const override;
+
 	/** A squad mate said something. Idle enemies move to investigate a contact. */
 	void OnCalloutReceived(ECalloutType Callout, AEnemyAIController* From);
 

@@ -196,12 +196,25 @@ protected:
 	/** Traces from the camera for a doorway the player might be ordering against */
 	void UpdateAimedDoorway();
 
+	/**
+	 *  Issues an order from the command line, so the squad can be driven without a keyboard:
+	 *    ProjectTF.exe -CQBOrder=stack -CQBOrderAfter=6 -CQBOrderDoor=1
+	 *  Orders are follow, hold, stack and clear; the door index picks which marker.
+	 */
+	void RunScriptedOrder();
+
+	FTimerHandle ScriptedOrderTimer;
+
 	/** Every living squad member */
 	TArray<AAllyAIController*> GetSquad() const;
 
 	/** How far the player can be from a doorway and still give orders about it */
 	UPROPERTY(EditDefaultsOnly, Category="Squad")
 	float DoorwayAimRange = 1200.0f;
+
+	/** How far off centre the crosshair can be and still count as aiming at a doorway */
+	UPROPERTY(EditDefaultsOnly, Category="Squad")
+	float DoorwayAimAngle = 18.0f;
 
 	/** Doorway under the crosshair this frame */
 	UPROPERTY(Transient)

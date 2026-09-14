@@ -50,6 +50,17 @@ AEnemyAIController::AEnemyAIController()
 	HearingConfig->DetectionByAffiliation.bDetectNeutrals = true;
 	HearingConfig->DetectionByAffiliation.bDetectFriendlies = true;
 
+	// Affiliation is set on the shared struct rather than per flag, so a stale copy cannot leave
+	// one of the three cleared. The sample has no use for filtering by side here: IsHostile
+	// decides what to do with a contact after the sense has reported it.
+	FAISenseAffiliationFilter DetectEverything;
+	DetectEverything.bDetectEnemies = true;
+	DetectEverything.bDetectNeutrals = true;
+	DetectEverything.bDetectFriendlies = true;
+
+	SightConfig->DetectionByAffiliation = DetectEverything;
+	HearingConfig->DetectionByAffiliation = DetectEverything;
+
 	AIPerception->ConfigureSense(*SightConfig);
 	AIPerception->ConfigureSense(*HearingConfig);
 	AIPerception->SetDominantSense(SightConfig->GetSenseImplementation());
@@ -113,6 +124,11 @@ bool AEnemyAIController::IsInCombat() const
 		|| CurrentState == ECQBAIState::Suppress;
 }
 
+FGenericTeamId AEnemyAIController::GetGenericTeamId() const
+{
+	return FGenericTeamId(Faction == ECQBFaction::Enemy ? 2 : 1);
+}
+
 bool AEnemyAIController::IsHostile(const AActor* Actor) const
 {
 	// a corpse is not a threat
@@ -131,6 +147,13 @@ bool AEnemyAIController::IsHostile(const AActor* Actor) const
 
 void AEnemyAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
+	// Verbose: turn on with "log LogProjectTF Verbose" when a contact is not being picked up
+	UE_LOG(LogProjectTF, Verbose, TEXT("CQB perc: %s sensed %s (mine=%s theirs=%s hostile=%d)"),
+		*DisplayName, *GetNameSafe(Actor),
+		*FCQBNames::FactionToString(Faction),
+		*FCQBNames::FactionToString(FCQBFactions::GetFaction(Actor)),
+		IsHostile(Actor) ? 1 : 0);
+
 	// friendly contacts are not worth reacting to
 	if (!IsHostile(Actor))
 	{

@@ -8,7 +8,6 @@
 #include "DoorwayMarker.generated.h"
 
 class UArrowComponent;
-class UBoxComponent;
 
 /**
  *  Marks an opening the squad can work: where to stack, and which way is through.
@@ -37,13 +36,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Doorway")
 	FString GetDisplayName() const { return DoorwayName.IsEmpty() ? GetActorLabelSafe() : DoorwayName; }
 
-	/** How far to either side the stack points sit */
+	/**
+	 *  How far to either side the stack points sit.
+	 *  A 2 m opening leaves no room to stand beside the frame, so this stays well inside half
+	 *  the corridor width; going wider puts the squad inside the wall.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Doorway")
-	float StackOffset = 100.0f;
+	float StackOffset = 55.0f;
 
 	/** How far back from the doorway the squad waits */
 	UPROPERTY(EditAnywhere, Category = "Doorway")
-	float StackSetback = 60.0f;
+	float StackSetback = 110.0f;
 
 	/** How far past the doorway the room point sits */
 	UPROPERTY(EditAnywhere, Category = "Doorway")
@@ -66,8 +69,4 @@ protected:
 	/** Entry direction, drawn in the editor */
 	UPROPERTY(VisibleAnywhere, Category = "Doorway")
 	UArrowComponent* EntryArrow;
-
-	/** What the player's aim trace hits */
-	UPROPERTY(VisibleAnywhere, Category = "Doorway")
-	UBoxComponent* AimTarget;
 };

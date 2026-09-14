@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "GenericTeamAgentInterface.h"
 #include "ProjectTFPlayerController.generated.h"
 
 class UInputMappingContext;
@@ -15,7 +16,7 @@ class UUserWidget;
  *  Overrides the Player Camera Manager class.
  */
 UCLASS(abstract, config="Game")
-class PROJECTTF_API AProjectTFPlayerController : public APlayerController
+class PROJECTTF_API AProjectTFPlayerController : public APlayerController, public IGenericTeamAgentInterface
 {
 	GENERATED_BODY()
 	
@@ -23,6 +24,9 @@ public:
 
 	/** Constructor */
 	AProjectTFPlayerController();
+
+	/** The player shares a team with the squad, so the AI sight sense treats both as one side */
+	virtual FGenericTeamId GetGenericTeamId() const override { return FGenericTeamId(1); }
 
 protected:
 

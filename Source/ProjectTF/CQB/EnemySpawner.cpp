@@ -12,6 +12,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "UnrealClient.h"
+#include "Kismet/GameplayStatics.h"
 #include "ProjectTF.h"
 
 AEnemySpawner::AEnemySpawner()
@@ -80,30 +81,77 @@ void AEnemySpawner::EnsureNavigationBuilt()
 		return;
 	}
 
-	// Tiles are generated around the navigation invokers the characters carry, which takes a
-	// moment on load. If nothing has landed under the spawner by now, nudge the system:
-	// re-announce the bounds volumes and ask for a build. Move orders issued before the tiles
-	// exist are retried by the AI controller, so this is a safety net rather than a requirement.
+	// Tiles are generated around the navigation invokers the characters carry, which takes about
+	// a second after the level loads.
+	//
+	// Do not call Build() here. With invoker driven generation a full rebuild wipes the tiles the
+	// invokers have produced and starts over, so asking for one on BeginPlay - before any invoker
+	// has had a chance to run - leaves the level with no navmesh at all. Move orders issued in the
+	// meantime are retried by the AI controller until the tiles arrive.
+	// Invoker driven generation still needs one kick to produce the first tiles: the octree
+	// exists, the bounds are registered, but nothing has asked for a build yet.
 	FNavLocation Projected;
-	if (NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(300.0f, 300.0f, 500.0f)))
+	if (!NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(300.0f, 300.0f, 500.0f)))
+	{
+		NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::InitialLock);
+
+		for (TActorIterator<ANavMeshBoundsVolume> It(GetWorld()); It; ++It)
+		{
+			NavSys->OnNavigationBoundsUpdated(*It);
+		}
+
+		NavSys->Build();
+	}
+
+	GetWorld()->GetTimerManager().SetTimer(NavReportTimer, this, &AEnemySpawner::ReportNavigationState, 4.0f, false);
+}
+
+void AEnemySpawner::ReportNavigationState()
+{
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (!NavSys)
 	{
 		return;
 	}
 
-	UE_LOG(LogProjectTF, Warning, TEXT("CQB nav: no navmesh under the spawner yet, kicking off a build"));
+	FNavLocation Projected;
+	const bool bHere = NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(400.0f, 400.0f, 500.0f));
 
-	NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::InitialLock);
+	int32 BoundsCount = NavSys->GetNavigationBounds().Num();
 
-	for (TActorIterator<ANavMeshBoundsVolume> It(GetWorld()); It; ++It)
+	UE_LOG(LogProjectTF, Warning, TEXT("CQB nav [%s]: navdata=%d bounds=%d projectHere=%d"),
+		*GetName(), NavSys->NavDataSet.Num(), BoundsCount, bHere ? 1 : 0);
+
+	// where is everyone, and can the first spawned pawn actually see the player
+	if (const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
 	{
-		NavSys->OnNavigationBoundsUpdated(*It);
-	}
+		FString Line = FString::Printf(TEXT("CQB where: player=%s"), *PlayerPawn->GetActorLocation().ToCompactString());
 
-	NavSys->Build();
+		for (const TObjectPtr<AEnemyCharacter>& Spawned : SpawnedEnemies)
+		{
+			if (!IsValid(Spawned))
+			{
+				continue;
+			}
+
+			const bool bLoS = Spawned->GetController() && Spawned->GetController()->LineOfSightTo(PlayerPawn);
+			Line += FString::Printf(TEXT("  %s=%s los=%d"), *Spawned->GetName(),
+				*Spawned->GetActorLocation().ToCompactString(), bLoS ? 1 : 0);
+		}
+
+		UE_LOG(LogProjectTF, Warning, TEXT("%s"), *Line);
+	}
 }
 
 void AEnemySpawner::DebugKillOneEnemy()
 {
+	// the ally spawner shares this class, and killing a squad member is not what the flag asks for
+	if (!SpawnedEnemies.IsEmpty() && IsValid(SpawnedEnemies[0])
+		&& SpawnedEnemies[0]->GetFaction() != ECQBFaction::Enemy)
+	{
+		return;
+	}
+
 	for (const TObjectPtr<AEnemyCharacter>& Enemy : SpawnedEnemies)
 	{
 		if (!IsValid(Enemy) || Enemy->IsDead())

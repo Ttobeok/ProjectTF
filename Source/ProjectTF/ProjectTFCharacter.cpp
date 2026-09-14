@@ -16,6 +16,9 @@
 #include "CQB/DoorwayMarker.h"
 #include "CQB/AllyAIController.h"
 #include "EngineUtils.h"
+#include "TimerManager.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "NavigationInvokerComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
@@ -79,6 +82,13 @@ void AProjectTFCharacter::BeginPlay()
 	{
 		HealthComponent->OnHealthChanged.AddDynamic(this, &AProjectTFCharacter::OnHealthChanged);
 		HealthComponent->OnDeath.AddDynamic(this, &AProjectTFCharacter::OnPlayerDeath);
+	}
+
+	// debug hook: drive the squad from the command line for headless checks
+	float OrderAfter = 0.0f;
+	if (FParse::Value(FCommandLine::Get(), TEXT("CQBOrderAfter="), OrderAfter) && OrderAfter > 0.0f)
+	{
+		GetWorld()->GetTimerManager().SetTimer(ScriptedOrderTimer, this, &AProjectTFCharacter::RunScriptedOrder, OrderAfter, false);
 	}
 
 	// The arms are not animated to hold anything, so they would be empty handed next to a
@@ -337,15 +347,43 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 		return;
 	}
 
-	const FVector Start = FirstPersonCameraComponent->GetComponentLocation();
-	const FVector End = Start + GetBaseAimRotation().Vector() * DoorwayAimRange;
+	// Picked geometrically rather than by a collision trace. Giving the doorway a box to trace
+	// against means giving it a collision channel, and the obvious one - visibility - is the same
+	// channel the AI sight sense uses, so the marker ends up blocking line of sight through the
+	// very doorway it describes.
+	const FVector ViewLocation = FirstPersonCameraComponent->GetComponentLocation();
+	const FVector ViewDirection = GetBaseAimRotation().Vector();
 
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBDoorwayAim), false, this);
+	float BestDot = FMath::Cos(FMath::DegreesToRadians(DoorwayAimAngle));
 
-	FHitResult Hit;
-	if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+	for (TActorIterator<ADoorwayMarker> It(World); It; ++It)
 	{
-		AimedDoorway = Cast<ADoorwayMarker>(Hit.GetActor());
+		ADoorwayMarker* Doorway = *It;
+
+		const FVector ToDoorway = Doorway->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f) - ViewLocation;
+		const float Distance = ToDoorway.Size();
+
+		if (Distance > DoorwayAimRange || Distance < KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+
+		const float Dot = FVector::DotProduct(ToDoorway / Distance, ViewDirection);
+		if (Dot < BestDot)
+		{
+			continue;
+		}
+
+		// no ordering a doorway through a wall
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBDoorwayAim), false, this);
+		FHitResult Blocker;
+		if (World->LineTraceSingleByChannel(Blocker, ViewLocation, Doorway->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), ECC_Visibility, Params))
+		{
+			continue;
+		}
+
+		BestDot = Dot;
+		AimedDoorway = Doorway;
 	}
 }
 
@@ -424,5 +462,47 @@ void AProjectTFCharacter::CommandClearOrTwo()
 	for (AAllyAIController* Member : GetSquad())
 	{
 		Member->OrderClear(AimedDoorway);
+	}
+}
+
+void AProjectTFCharacter::RunScriptedOrder()
+{
+	FString Order;
+	FParse::Value(FCommandLine::Get(), TEXT("CQBOrder="), Order);
+
+	int32 DoorIndex = 0;
+	FParse::Value(FCommandLine::Get(), TEXT("CQBOrderDoor="), DoorIndex);
+
+	// pick the doorway by index, in the order the level lists them
+	TArray<ADoorwayMarker*> Doorways;
+	for (TActorIterator<ADoorwayMarker> It(GetWorld()); It; ++It)
+	{
+		Doorways.Add(*It);
+	}
+	Doorways.Sort([](const ADoorwayMarker& A, const ADoorwayMarker& B)
+	{
+		return A.GetActorLocation().X < B.GetActorLocation().X;
+	});
+
+	AimedDoorway = Doorways.IsValidIndex(DoorIndex) ? Doorways[DoorIndex] : nullptr;
+
+	UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: scripted order '%s' on %s"),
+		*Order, AimedDoorway ? *AimedDoorway->GetDisplayName() : TEXT("no doorway"));
+
+	if (Order == TEXT("hold"))
+	{
+		CommandHold();
+	}
+	else if (Order == TEXT("stack"))
+	{
+		CommandStackOrOne();
+	}
+	else if (Order == TEXT("clear"))
+	{
+		CommandClearOrTwo();
+	}
+	else
+	{
+		CommandFollow();
 	}
 }
