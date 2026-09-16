@@ -57,8 +57,15 @@ ACQBCharacter::ACQBCharacter()
 	bUseControllerRotationRoll = false;
 
 	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
-	GetCharacterMovement()->MaxWalkSpeed = 380.0f;
+
+	// 540 deg/s spins a pawn to face a new heading almost instantly, which reads as a turret
+	// rather than a person. Slower, so a change of direction costs something to watch.
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 300.0f, 0.0f);
+
+	// 2.3 m/s: a purposeful walk. Room to room in a building nobody runs, and at the 3.8 m/s
+	// this used to be, a suspect crossed an 8 m room in two seconds and the fight was over
+	// before the player had read it.
+	GetCharacterMovement()->MaxWalkSpeed = 230.0f;
 
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
