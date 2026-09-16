@@ -353,6 +353,23 @@ protected:
 	void CycleElementDown();
 
 	/**
+	 *  Doorways in the level, collected once. They are placed by hand and never spawned, and
+	 *  walking every actor in the world twice a frame to find them is not worth a text hint.
+	 *
+	 *  레벨의 문들. 한 번만 모읍니다. 손으로 배치되며 스폰되지 않는데, 텍스트 힌트 하나를
+	 *  띄우자고 매 프레임 월드 전체를 두 번 훑을 이유가 없습니다.
+	 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ADoorwayMarker>> LevelDoorways;
+
+	/**
+	 *  Squad list, rebuilt when it changes rather than rebuilt every frame by the HUD.
+	 *  분대 목록. HUD가 매 프레임 다시 만들지 않고, 바뀔 때만 다시 만듭니다.
+	 */
+	UPROPERTY(Transient)
+	mutable TArray<TObjectPtr<AAllyAIController>> CachedSquad;
+
+	/**
 	 *  Trace params for the order and challenge traces: ignores the player and the squad.
 	 *  명령·외침 트레이스용 파라미터. 플레이어와 분대원을 무시합니다.
 	 */

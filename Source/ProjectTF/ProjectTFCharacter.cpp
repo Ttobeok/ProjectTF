@@ -411,6 +411,14 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 		return;
 	}
 
+	if (LevelDoorways.Num() == 0)
+	{
+		for (TActorIterator<ADoorwayMarker> It(World); It; ++It)
+		{
+			LevelDoorways.Add(*It);
+		}
+	}
+
 	// Picked geometrically rather than by a collision trace. Giving the doorway a box to trace
 	// against means giving it a collision channel, and the obvious one - visibility - is the same
 	// channel the AI sight sense uses, so the marker ends up blocking line of sight through the
@@ -423,9 +431,12 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 
 	float BestDistance = DoorwayAimRange;
 
-	for (TActorIterator<ADoorwayMarker> It(World); It; ++It)
+	for (ADoorwayMarker* Doorway : LevelDoorways)
 	{
-		ADoorwayMarker* Doorway = *It;
+		if (!IsValid(Doorway))
+		{
+			continue;
+		}
 
 		const FVector ToDoorway = Doorway->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f) - ViewLocation;
 		const float Distance = ToDoorway.Size();
@@ -469,22 +480,54 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 
 	// tell every doorway where it stands, so the highlight follows the crosshair
 	// 모든 문에 자기 상태를 알려줍니다. 그래야 표시가 크로스헤어를 따라갑니다
-	for (TActorIterator<ADoorwayMarker> It(World); It; ++It)
+	for (ADoorwayMarker* Doorway : LevelDoorways)
 	{
-		It->SetAimedAt(*It == AimedDoorway);
+		if (IsValid(Doorway))
+		{
+			Doorway->SetAimedAt(Doorway == AimedDoorway);
+		}
 	}
 }
 
 TArray<AAllyAIController*> AProjectTFCharacter::GetSquad() const
 {
-	TArray<AAllyAIController*> Squad;
+	// The HUD asks for this every rendered frame. Walking every actor in the world that often
+	// to build a four line roster is not reasonable, so the list is kept and only rebuilt when
+	// something in it has gone - which is the only way it shrinks, and a rare event.
+	//
+	// HUD가 렌더 프레임마다 이걸 요청합니다. 네 줄짜리 명부를 만들자고 그렇게 자주 월드 전체를
+	// 훑을 수는 없으니, 목록을 들고 있다가 그 안의 무언가가 사라졌을 때만 다시 만듭니다.
+	// 목록이 줄어드는 경우는 그것뿐이고, 자주 있는 일도 아닙니다.
+	bool bStale = CachedSquad.Num() == 0;
 
-	for (TActorIterator<AAllyAIController> It(GetWorld()); It; ++It)
+	for (const TObjectPtr<AAllyAIController>& Member : CachedSquad)
 	{
-		if (IsValid(*It) && It->GetPawn())
+		if (!IsValid(Member) || !Member->GetPawn())
 		{
-			Squad.Add(*It);
+			bStale = true;
+			break;
 		}
+	}
+
+	if (bStale)
+	{
+		CachedSquad.Reset();
+
+		for (TActorIterator<AAllyAIController> It(GetWorld()); It; ++It)
+		{
+			if (IsValid(*It) && It->GetPawn())
+			{
+				CachedSquad.Add(*It);
+			}
+		}
+	}
+
+	TArray<AAllyAIController*> Squad;
+	Squad.Reserve(CachedSquad.Num());
+
+	for (const TObjectPtr<AAllyAIController>& Member : CachedSquad)
+	{
+		Squad.Add(Member);
 	}
 
 	// stable order, so Red always lists before Blue

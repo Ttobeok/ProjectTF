@@ -563,6 +563,19 @@ protected:
 	bool bLastMoveFailed = false;
 
 	/**
+	 *  How often the sight line is re-confirmed, in seconds. Every frame is wasteful.
+	 *  시선을 다시 확인하는 주기(초). 매 프레임은 낭비입니다.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Perception")
+	float SightConfirmInterval = 0.1f;
+
+	/**
+	 *  Seconds since the last sight confirmation
+	 *  마지막 시선 확인 이후 경과 시간
+	 */
+	float SightConfirmTimer = 0.0f;
+
+	/**
 	 *  Seconds since the last move request, used to pace retries
 	 *  마지막 이동 요청 이후 경과 시간. 재시도 간격 조절에 씁니다
 	 */

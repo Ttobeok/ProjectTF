@@ -44,6 +44,15 @@ void UWeaponComponent::BeginPlay()
 	CurrentAmmo = GetMagSize();
 	OnAmmoChanged.Broadcast(CurrentAmmo, GetMagSize());
 
+	// Nothing in TickComponent applies without a camera: UpdateADS needs one and RecoverRecoil
+	// only runs when the recoil goes to a controller, which it does not for AI. An AI weapon
+	// paid a tick registration and dispatch per frame for two immediate returns.
+	//
+	// 카메라가 없으면 TickComponent에서 할 일이 없습니다. UpdateADS는 카메라가 필요하고,
+	// RecoverRecoil은 반동이 컨트롤러로 가는 경우에만 도는데 AI는 아닙니다. AI 무기는 즉시
+	// 반환되는 두 함수를 위해 매 프레임 틱 등록과 디스패치 비용을 내고 있었습니다.
+	SetComponentTickEnabled(OwnerCamera != nullptr);
+
 	// start from the hip FOV so ADS has something to blend from
 	// 정조준이 보간을 시작할 기준이 있도록 허리 FOV에서 출발합니다
 	if (OwnerCamera)

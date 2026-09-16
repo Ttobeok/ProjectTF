@@ -13,6 +13,7 @@
 #include "EnemyAIController.h"
 #include "CQBTypes.h"
 #include "CQBCharacter.h"
+#include "CQBSightTarget.h"
 #include "SquadManager.h"
 #include "WeaponComponent.h"
 #include "HealthComponent.h"
@@ -261,13 +262,40 @@ void AEnemyAIController::UpdateSenses(float DeltaTime)
 		return;
 	}
 
-	// perception drives acquisition through the vision cone; this confirms the sight line
-	// every frame so ducking behind cover registers immediately instead of on the next update
-	// 획득 자체는 시야 원뿔로 인지가 합니다. 여기서는 매 프레임 시선을 확인해,
-	// 엄폐물 뒤로 숨는 것이 다음 갱신이 아니라 즉시 반영되게 합니다
-	if (bHasLineOfSight && !LineOfSightTo(CurrentTarget))
+	// Perception drives acquisition through the vision cone; this confirms the sight line so
+	// ducking behind cover registers promptly instead of on the next perception update.
+	//
+	// It uses the same three probes the sight sense does rather than AController::LineOfSightTo,
+	// which tests the actor origin - the waist, the exact point CQBSightTarget exists to avoid -
+	// and the top of the capsule. Against 110 cm cover those two disagree with the sense every
+	// time, and the AI would stop firing at someone it can plainly see.
+	//
+	// Rate limited: LineOfSightTo traced complex geometry every frame for every AI.
+	//
+	// 획득 자체는 시야 원뿔로 인지가 합니다. 여기서는 시선을 확인해, 엄폐물 뒤로 숨는 것이
+	// 다음 인지 갱신이 아니라 곧바로 반영되게 합니다.
+	//
+	// AController::LineOfSightTo 대신 시야 감각과 같은 3점을 씁니다. 그쪽은 액터 원점(허리,
+	// CQBSightTarget이 바로 그걸 피하려고 존재합니다)과 캡슐 꼭대기를 검사하는데, 110cm
+	// 엄폐물 앞에서는 매번 감각과 어긋나서 AI가 훤히 보이는 상대에게 사격을 멈춥니다.
+	//
+	// 빈도도 제한합니다. 기존에는 AI마다 매 프레임 복잡 지오메트리를 트레이스했습니다.
+	SightConfirmTimer += DeltaTime;
+
+	if (bHasLineOfSight && SightConfirmTimer >= SightConfirmInterval)
 	{
-		bHasLineOfSight = false;
+		SightConfirmTimer = 0.0f;
+
+		const APawn* MyPawn = GetPawn();
+		FVector SeenLocation = FVector::ZeroVector;
+		int32 Checks = 0;
+		float Strength = 0.0f;
+
+		if (MyPawn && !CQBSightTarget::CanBeSeenFrom(*CurrentTarget, MyPawn->GetPawnViewLocation(),
+			MyPawn, SeenLocation, Checks, Strength))
+		{
+			bHasLineOfSight = false;
+		}
 	}
 
 	if (bHasLineOfSight)
@@ -464,6 +492,7 @@ void AEnemyAIController::ExitState(ECQBAIState State)
 
 void AEnemyAIController::DrawStateDebug(float DeltaTime) const
 {
+#if ENABLE_DRAW_DEBUG
 	const APawn* MyPawn = GetPawn();
 	if (!bDrawStateDebug || !MyPawn)
 	{
@@ -479,4 +508,5 @@ void AEnemyAIController::DrawStateDebug(float DeltaTime) const
 	const FColor Color = IsInCombat() ? FColor::Red : (CurrentState == ECQBAIState::Investigate ? FColor::Yellow : FColor::White);
 
 	DrawDebugString(GetWorld(), MyPawn->GetActorLocation() + FVector(0.0f, 0.0f, 120.0f), Text, nullptr, Color, 0.0f, true);
+#endif
 }
