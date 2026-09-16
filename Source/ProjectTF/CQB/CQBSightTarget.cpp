@@ -1,4 +1,5 @@
 // CQB Sample - how a character is seen by the AI sight sense.
+// CQB 샘플 - AI 시야 감각이 캐릭터를 어떻게 보는가.
 
 #include "CQBSightTarget.h"
 #include "Engine/World.h"

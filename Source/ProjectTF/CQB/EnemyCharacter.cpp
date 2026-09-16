@@ -1,4 +1,5 @@
 // CQB Sample - a hostile.
+// CQB 샘플 - 적대 세력.
 
 #include "EnemyCharacter.h"
 #include "EnemyAIController.h"
