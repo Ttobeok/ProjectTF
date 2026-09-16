@@ -1,4 +1,5 @@
 // CQB Sample - every debug hook, in one place and out of the gameplay classes.
+// CQB 샘플 - 모든 디버그 훅을 한곳에, 게임플레이 클래스 바깥에.
 
 #include "CQBDebugDirector.h"
 #include "CQBCharacter.h"
@@ -60,6 +61,7 @@ void ACQBDebugDirector::ArmFromCommandLine()
 	FTimerManager& Timers = GetWorld()->GetTimerManager();
 
 	// the player pawn is not possessed yet at BeginPlay, so give it a moment
+	// BeginPlay 시점에는 플레이어 폰이 아직 빙의되지 않았으므로 잠깐 여유를 줍니다
 	Timers.SetTimer(PlaceTimer, this, &ACQBDebugDirector::PlacePlayer, 0.5f, false);
 
 	float DamageAfter = 0.0f;
@@ -137,6 +139,7 @@ void ACQBDebugDirector::PlacePlayer()
 {
 	FString Spot;
 	// the last argument keeps FParse from stopping at the commas
+	// 마지막 인자가 FParse가 쉼표에서 멈추지 않게 해줍니다
 	if (!FParse::Value(FCommandLine::Get(), TEXT("CQBPlayerAt="), Spot, false))
 	{
 		return;
@@ -194,6 +197,7 @@ void ACQBDebugDirector::RunOrder()
 		*OrderName, Doorway ? *Doorway->GetDisplayName() : TEXT("no doorway"));
 
 	// a shout needs a suspect rather than a doorway
+	// 외침은 문이 아니라 용의자를 대상으로 합니다
 	if (OrderName == TEXT("challenge"))
 	{
 		const TArray<ACQBCharacter*> Suspects = GatherSuspects();
@@ -213,5 +217,8 @@ void ACQBDebugDirector::RunScreenshot()
 
 	// with UI, or the shot is useless: the HUD draws to Canvas but DrawDebugString goes to the
 	// separate DebugCanvas, and a no-UI capture silently drops the state text over each pawn
+	// UI를 포함해야 합니다. 안 그러면 쓸모없는 스크린샷이 됩니다 — HUD는 Canvas에 그리지만
+	// DrawDebugString은 별개인 DebugCanvas에 그려서, UI 없는 캡처는 폰 위의 상태 텍스트를
+	// 조용히 빠뜨립니다
 	FScreenshotRequest::RequestScreenshot(true);
 }

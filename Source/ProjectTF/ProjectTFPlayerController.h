@@ -14,6 +14,9 @@ class UUserWidget;
  *  Simple first person Player Controller
  *  Manages the input mapping context.
  *  Overrides the Player Camera Manager class.
+ *
+ *  단순한 1인칭 플레이어 컨트롤러입니다.
+ *  입력 매핑 컨텍스트를 관리하고, Player Camera Manager 클래스를 교체합니다.
  */
 UCLASS(abstract, config="Game")
 class PROJECTTF_API AProjectTFPlayerController : public APlayerController, public IGenericTeamAgentInterface
@@ -22,27 +25,45 @@ class PROJECTTF_API AProjectTFPlayerController : public APlayerController, publi
 	
 public:
 
-	/** Constructor */
+	/**
+	 *  Constructor
+	 *  생성자
+	 */
 	AProjectTFPlayerController();
 
-	/** The player shares a team with the squad, so the AI sight sense treats both as one side */
+	/**
+	 *  The player shares a team with the squad, so the AI sight sense treats both as one side
+	 *  플레이어는 분대와 같은 팀입니다. 그래야 AI 시야 감각이 둘을 한편으로 취급합니다
+	 */
 	virtual FGenericTeamId GetGenericTeamId() const override { return FGenericTeamId(1); }
 
 protected:
 
-	/** Input Mapping Contexts */
+	/**
+	 *  Input Mapping Contexts
+	 *  입력 매핑 컨텍스트
+	 */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
 	TArray<UInputMappingContext*> DefaultMappingContexts;
 
-	/** Input Mapping Contexts */
+	/**
+	 *  Input Mapping Contexts
+	 *  입력 매핑 컨텍스트
+	 */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
 	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 
-	/** Mobile controls widget to spawn */
+	/**
+	 *  Mobile controls widget to spawn
+	 *  스폰할 모바일 컨트롤 위젯
+	 */
 	UPROPERTY(EditAnywhere, Category="Input|Touch Controls")
 	TSubclassOf<UUserWidget> MobileControlsWidgetClass;
 
-	/** Pointer to the mobile controls widget */
+	/**
+	 *  Pointer to the mobile controls widget
+	 *  모바일 컨트롤 위젯 포인터
+	 */
 	UPROPERTY()
 	TObjectPtr<UUserWidget> MobileControlsWidget;
 

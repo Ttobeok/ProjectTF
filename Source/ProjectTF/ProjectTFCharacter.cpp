@@ -32,9 +32,11 @@ AProjectTFCharacter::AProjectTFCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 
 	// Set size for collision capsule
+	// 충돌 캡슐 크기를 설정합니다
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
 
 	// Create the first person mesh that will be viewed only by this character's owner
+	// 이 캐릭터의 소유자에게만 보이는 1인칭 메시를 만듭니다
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 
 	FirstPersonMesh->SetupAttachment(GetMesh());
@@ -43,6 +45,7 @@ AProjectTFCharacter::AProjectTFCharacter()
 	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
 
 	// Create the Camera Component
+	// 카메라 컴포넌트를 만듭니다
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("First Person Camera"));
 	FirstPersonCameraComponent->SetupAttachment(FirstPersonMesh, FName("head"));
 	FirstPersonCameraComponent->SetRelativeLocationAndRotation(FVector(-2.8f, 5.89f, 0.0f), FRotator(0.0f, 90.0f, -90.0f));
@@ -53,6 +56,7 @@ AProjectTFCharacter::AProjectTFCharacter()
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
 
 	// CQB gameplay components, shared with the AI enemies
+	// CQB 게임플레이 컴포넌트. AI와 공유합니다
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("Health Component"));
 
 	WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("Weapon Component"));
@@ -60,20 +64,24 @@ AProjectTFCharacter::AProjectTFCharacter()
 	WeaponComponent->bApplyRecoilToController = true;
 
 	// the visible weapon, riding the camera. It attaches itself on BeginPlay.
+	// 카메라에 올라타는, 눈에 보이는 무기. BeginPlay에서 스스로 부착합니다.
 	WeaponVisual = CreateDefaultSubobject<UWeaponVisualComponent>(TEXT("Weapon Visual"));
 	WeaponVisual->SetupAttachment(FirstPersonCameraComponent);
 	WeaponVisual->AttachMode = EWeaponAttachMode::Camera;
 
 	// configure the character comps
+	// 캐릭터 컴포넌트를 설정합니다
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
 
 	GetCapsuleComponent()->SetCapsuleSize(34.0f, 96.0f);
 
 	// make sure enemy bullets and AI sight traces can hit the player
+	// 적의 탄과 AI 시야 트레이스가 플레이어에게 닿도록 합니다
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
 	// Configure character movement
+	// 캐릭터 무브먼트를 설정합니다
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 	GetCharacterMovement()->AirControl = 0.5f;
 }
@@ -90,6 +98,8 @@ void AProjectTFCharacter::BeginPlay()
 
 	// The arms are not animated to hold anything, so they would be empty handed next to a
 	// weapon that rides the camera. Hiding them keeps the view honest.
+	// 팔에는 무언가를 쥐는 애니메이션이 없어서, 카메라에 올라탄 무기 옆에 빈손으로 놓이게
+	// 됩니다. 숨기는 편이 화면을 정직하게 유지합니다.
 	if (FirstPersonMesh)
 	{
 		FirstPersonMesh->SetVisibility(false, false);
@@ -101,6 +111,7 @@ void AProjectTFCharacter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	// blend the lean towards the requested side
+	// 요청된 방향으로 린을 보간합니다
 	CurrentLeanRoll = FMath::FInterpTo(CurrentLeanRoll, LeanTarget * LeanRollAngle, DeltaSeconds, LeanInterpSpeed);
 	CurrentLeanOffset = FMath::FInterpTo(CurrentLeanOffset, LeanTarget * LeanOffsetDistance, DeltaSeconds, LeanInterpSpeed);
 
@@ -114,20 +125,25 @@ void AProjectTFCharacter::Tick(float DeltaSeconds)
 void AProjectTFCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
+	// 액션 바인딩을 설정합니다
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		// Jumping
+		// 점프
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AProjectTFCharacter::DoJumpStart);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AProjectTFCharacter::DoJumpEnd);
 
 		// Moving
+		// 이동
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AProjectTFCharacter::MoveInput);
 
 		// Looking/Aiming
+		// 시점/조준
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AProjectTFCharacter::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AProjectTFCharacter::LookInput);
 
 		// CQB actions. These Input Actions are optional; see the direct key bindings below.
+		// CQB 액션들. 이 Input Action들은 선택 사항입니다. 아래의 직접 키 바인딩을 보세요.
 		if (CQBFireAction)
 		{
 			EnhancedInputComponent->BindAction(CQBFireAction, ETriggerEvent::Started, this, &AProjectTFCharacter::DoFireStart);
@@ -164,6 +180,8 @@ void AProjectTFCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 	// Direct key bindings so the CQB controls work without authoring any Input Action assets.
 	// Assign the matching Input Action above to take over a binding.
+	// Input Action 에셋을 하나도 만들지 않아도 CQB 조작이 동작하도록 직접 키를 바인딩합니다.
+	// 위에서 해당 Input Action을 지정하면 그쪽이 바인딩을 가져갑니다.
 	if (PlayerInputComponent)
 	{
 		if (!CQBFireAction)
@@ -196,6 +214,7 @@ void AProjectTFCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		}
 
 		// squad commands
+		// 분대 명령
 		PlayerInputComponent->BindKey(EKeys::Z, IE_Pressed, this, &AProjectTFCharacter::CommandFollow);
 		PlayerInputComponent->BindKey(EKeys::H, IE_Pressed, this, &AProjectTFCharacter::CommandHold);
 		PlayerInputComponent->BindKey(EKeys::One, IE_Pressed, this, &AProjectTFCharacter::CommandStackOrOne);
@@ -211,9 +230,11 @@ void AProjectTFCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 void AProjectTFCharacter::MoveInput(const FInputActionValue& Value)
 {
 	// get the Vector2D move axis
+	// Vector2D 이동 축을 가져옵니다
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
 	// pass the axis values to the move input
+	// 축 값을 이동 입력으로 넘깁니다
 	DoMove(MovementVector.X, MovementVector.Y);
 
 }
@@ -221,9 +242,11 @@ void AProjectTFCharacter::MoveInput(const FInputActionValue& Value)
 void AProjectTFCharacter::LookInput(const FInputActionValue& Value)
 {
 	// get the Vector2D look axis
+	// Vector2D 시점 축을 가져옵니다
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 
 	// pass the axis values to the aim input
+	// 축 값을 조준 입력으로 넘깁니다
 	DoAim(LookAxisVector.X, LookAxisVector.Y);
 
 }
@@ -233,6 +256,7 @@ void AProjectTFCharacter::DoAim(float Yaw, float Pitch)
 	if (GetController())
 	{
 		// pass the rotation inputs
+		// 회전 입력을 넘깁니다
 		AddControllerYawInput(Yaw);
 		AddControllerPitchInput(Pitch);
 	}
@@ -243,6 +267,7 @@ void AProjectTFCharacter::DoMove(float Right, float Forward)
 	if (GetController())
 	{
 		// pass the move inputs
+		// 이동 입력을 넘깁니다
 		AddMovementInput(GetActorRightVector(), Right);
 		AddMovementInput(GetActorForwardVector(), Forward);
 	}
@@ -251,12 +276,14 @@ void AProjectTFCharacter::DoMove(float Right, float Forward)
 void AProjectTFCharacter::DoJumpStart()
 {
 	// pass Jump to the character
+	// Jump를 캐릭터로 넘깁니다
 	Jump();
 }
 
 void AProjectTFCharacter::DoJumpEnd()
 {
 	// pass StopJumping to the character
+	// StopJumping을 캐릭터로 넘깁니다
 	StopJumping();
 }
 
@@ -311,6 +338,7 @@ void AProjectTFCharacter::OnHealthChanged(UHealthComponent* HealthComp, float Ne
 	if (Delta < 0.0f && GEngine)
 	{
 		// the raw actor name in a packaged build is EnemyCharacter_2147482371; say Enemy_1 instead
+		// 패키지 빌드에서 액터 원래 이름은 EnemyCharacter_2147482371입니다. 대신 Enemy_1로 부릅니다
 		FString From = GetNameSafe(Causer);
 		if (const APawn* CauserPawn = Cast<APawn>(Causer))
 		{
@@ -333,6 +361,7 @@ void AProjectTFCharacter::OnPlayerDeath(AActor* DeadActor, AActor* Killer)
 	}
 
 	// stop shooting and hand back control
+	// 사격을 멈추고 조작을 돌려줍니다
 	if (WeaponComponent)
 	{
 		WeaponComponent->StopFire();
@@ -348,6 +377,7 @@ void AProjectTFCharacter::OnPlayerDeath(AActor* DeadActor, AActor* Killer)
 
 
 //~ Squad commands --------------------------------------------------------------
+//~ Squad commands / 분대 명령 ----------------------------------------------------
 
 void AProjectTFCharacter::UpdateAimedDoorway()
 {
@@ -363,6 +393,9 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 	// against means giving it a collision channel, and the obvious one - visibility - is the same
 	// channel the AI sight sense uses, so the marker ends up blocking line of sight through the
 	// very doorway it describes.
+	// 충돌 트레이스가 아니라 기하학적으로 고릅니다. 문에 트레이스용 박스를 달면 충돌 채널을
+	// 줘야 하는데, 가장 자연스러운 선택인 visibility는 AI 시야 감각이 쓰는 바로 그 채널입니다.
+	// 그러면 마커가 자기가 가리키는 그 문의 시야를 막아버립니다.
 	const FVector ViewLocation = FirstPersonCameraComponent->GetComponentLocation();
 	const FVector ViewDirection = GetBaseAimRotation().Vector();
 
@@ -387,6 +420,7 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 		}
 
 		// no ordering a doorway through a wall
+		// 벽 너머의 문에는 명령할 수 없습니다
 		FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBDoorwayAim), false, this);
 		FHitResult Blocker;
 		if (World->LineTraceSingleByChannel(Blocker, ViewLocation, Doorway->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), ECC_Visibility, Params))
@@ -399,6 +433,7 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 	}
 
 	// tell every doorway where it stands, so the highlight follows the crosshair
+	// 모든 문에 자기 상태를 알려줍니다. 그래야 표시가 크로스헤어를 따라갑니다
 	for (TActorIterator<ADoorwayMarker> It(World); It; ++It)
 	{
 		It->SetAimedAt(*It == AimedDoorway);
@@ -418,6 +453,7 @@ TArray<AAllyAIController*> AProjectTFCharacter::GetSquad() const
 	}
 
 	// stable order, so Red always lists before Blue
+	// 일정한 순서. Red가 항상 Blue보다 먼저 나열되게 합니다
 	Squad.Sort([](const AAllyAIController& A, const AAllyAIController& B)
 	{
 		return A.GetDisplayName() < B.GetDisplayName();
@@ -525,11 +561,13 @@ void AProjectTFCharacter::IssueChallenge(AActor* Suspect)
 	}
 
 	// a shout is a noise like any other; anyone nearby hears it
+	// 외침도 다른 소리와 마찬가지입니다. 근처에 있으면 누구든 듣습니다
 	UAISense_Hearing::ReportNoiseEvent(GetWorld(), GetActorLocation(), 1.5f, this, ChallengeRange, TEXT("Shout"));
 
 	if (AEnemyAIController* Brain = Cast<AEnemyAIController>(SuspectPawn->GetController()))
 	{
 		// aiming straight at them is what makes a demand credible
+		// 정면으로 겨누고 있다는 사실이 그 요구에 무게를 실어줍니다
 		Brain->ReceiveChallenge(this, 0.35f);
 	}
 }
