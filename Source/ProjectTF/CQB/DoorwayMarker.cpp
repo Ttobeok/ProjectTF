@@ -49,8 +49,8 @@ void ADoorwayMarker::Tick(float DeltaSeconds)
 	}
 
 	const UWorld* World = GetWorld();
-	DrawDebugSphere(World, GetStackPoint(EStackSide::Left), 25.0f, 8, FColor::Green, false, DeltaSeconds);
-	DrawDebugSphere(World, GetStackPoint(EStackSide::Right), 25.0f, 8, FColor::Blue, false, DeltaSeconds);
-	DrawDebugSphere(World, GetClearPoint(), 35.0f, 8, FColor::Yellow, false, DeltaSeconds);
-	DrawDebugLine(World, GetActorLocation(), GetClearPoint(), FColor::Yellow, false, DeltaSeconds);
+	DrawDebugSphere(World, GetStackPoint(EStackSide::Left), 25.0f, 8, FColor::Green, false, -1.0f);
+	DrawDebugSphere(World, GetStackPoint(EStackSide::Right), 25.0f, 8, FColor::Blue, false, -1.0f);
+	DrawDebugSphere(World, GetClearPoint(), 35.0f, 8, FColor::Yellow, false, -1.0f);
+	DrawDebugLine(World, GetActorLocation(), GetClearPoint(), FColor::Yellow, false, -1.0f);
 }
