@@ -1,6 +1,7 @@
 // CQB Sample - the squad member brain. Takes orders, fights with the shared combat states.
 
 #include "AllyAIController.h"
+#include "CQBCharacter.h"
 #include "DoorwayMarker.h"
 #include "HealthComponent.h"
 #include "Engine/Engine.h"
@@ -37,6 +38,12 @@ void AAllyAIController::OnPossess(APawn* InPawn)
 
 	SetDisplayName(FString::Printf(TEXT("%s_%d"),
 		Element == ESquadElement::Red ? TEXT("RED") : TEXT("BLU"), (Taken / 2) + 1));
+
+	// wear the element colour, so the player can tell Red from Blue at a glance in a corridor
+	if (ACQBCharacter* Body = Cast<ACQBCharacter>(InPawn))
+	{
+		Body->SetBodyTint(Element == ESquadElement::Red ? RedTint : BlueTint);
+	}
 
 	// squad members start at the player's shoulder
 	OrderFollow();

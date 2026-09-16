@@ -63,6 +63,17 @@ public:
 	/** Puts the weapon away and drops into a kneel. Called by the AI controller. */
 	void SetSurrendered(bool bInSurrendered);
 
+	/**
+	 *  Tints the whole body. The squad uses it to wear its element colour, so a glance at a
+	 *  figure in a doorway says whose it is before the name over its head is readable.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "CQB")
+	void SetBodyTint(FLinearColor Tint);
+
+	/** Vector parameter on the body material that SetBodyTint writes. M_Mannequin calls it this. */
+	UPROPERTY(EditAnywhere, Category = "CQB")
+	FName BodyTintParameter = FName("Paint Tint");
+
 	//~Begin ICQBFactionAgent
 	virtual ECQBFaction GetFaction() const override { return Faction; }
 	//~End ICQBFactionAgent

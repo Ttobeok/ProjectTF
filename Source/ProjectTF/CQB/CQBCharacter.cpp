@@ -13,6 +13,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "ProjectTF.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
@@ -111,6 +112,37 @@ void ACQBCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void ACQBCharacter::SetBodyTint(FLinearColor Tint)
+{
+	USkeletalMeshComponent* MeshComponent = GetMesh();
+	if (!MeshComponent)
+	{
+		return;
+	}
+
+	const int32 SlotCount = MeshComponent->GetNumMaterials();
+	for (int32 Slot = 0; Slot < SlotCount; ++Slot)
+	{
+		UMaterialInstanceDynamic* Dynamic = MeshComponent->CreateAndSetMaterialInstanceDynamic(Slot);
+		if (!Dynamic)
+		{
+			continue;
+		}
+
+		FLinearColor Existing;
+		if (!Dynamic->GetVectorParameterValue(FMaterialParameterInfo(BodyTintParameter), Existing))
+		{
+			// setting a parameter the material has never heard of does nothing and says nothing,
+			// so say it here rather than wonder later why everyone is still grey
+			UE_LOG(LogProjectTF, Warning, TEXT("CQB: %s has no '%s' parameter on material %d, tint ignored"),
+				*GetName(), *BodyTintParameter.ToString(), Slot);
+			continue;
+		}
+
+		Dynamic->SetVectorParameterValue(BodyTintParameter, Tint);
+	}
 }
 
 void ACQBCharacter::OnCharacterDeath(AActor* DeadActor, AActor* Killer)

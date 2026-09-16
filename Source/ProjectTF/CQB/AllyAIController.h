@@ -89,6 +89,14 @@ protected:
 	/** The player pawn this squad member follows */
 	AActor* GetLeader() const;
 
+	/** Body colour for Red element. Kept pale so it reads as a uniform rather than a highlight. */
+	UPROPERTY(EditDefaultsOnly, Category = "Squad Order")
+	FLinearColor RedTint = FLinearColor(0.85f, 0.32f, 0.30f);
+
+	/** Body colour for Blue element */
+	UPROPERTY(EditDefaultsOnly, Category = "Squad Order")
+	FLinearColor BlueTint = FLinearColor(0.34f, 0.46f, 0.88f);
+
 	/** How far behind the player to settle */
 	UPROPERTY(EditDefaultsOnly, Category = "Squad Order")
 	float FollowDistance = 300.0f;
