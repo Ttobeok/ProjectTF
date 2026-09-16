@@ -132,27 +132,25 @@ void ACQBCharacter::OnCharacterDeath(AActor* DeadActor, AActor* Killer)
 	GetCharacterMovement()->DisableMovement();
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	if (bRagdollOnDeath)
+	if (!bRagdollOnDeath)
 	{
-		GetMesh()->SetCollisionProfileName(FName("Ragdoll"));
-		GetMesh()->SetAllBodiesSimulatePhysics(true);
-		GetMesh()->SetSimulatePhysics(true);
-		GetMesh()->WakeAllRigidBodies();
-	}
-	else
-	{
-		DeferredDestructionTime = 0.0f;
+		// nothing worth looking at, so do not leave an empty capsule standing about
+		DeferredDestroy();
+		return;
 	}
 
-	if (UWorld* World = GetWorld())
+	// the Ragdoll profile ignores the visibility channel, so a body neither blocks the AI's
+	// line of sight nor stops a shot: it lies there and is walked around
+	GetMesh()->SetCollisionProfileName(FName("Ragdoll"));
+	GetMesh()->SetAllBodiesSimulatePhysics(true);
+	GetMesh()->SetSimulatePhysics(true);
+	GetMesh()->WakeAllRigidBodies();
+
+	if (DeferredDestructionTime > 0.0f)
 	{
-		if (DeferredDestructionTime > 0.0f)
+		if (UWorld* World = GetWorld())
 		{
 			World->GetTimerManager().SetTimer(DestroyTimerHandle, this, &ACQBCharacter::DeferredDestroy, DeferredDestructionTime, false);
-		}
-		else
-		{
-			DeferredDestroy();
 		}
 	}
 }

@@ -97,9 +97,13 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "CQB")
 	bool bRagdollOnDeath = true;
 
-	/** Seconds the corpse stays around before being destroyed */
+	/**
+	 *  Seconds a body lies there before it is removed. Zero or less leaves it for good, which is
+	 *  the default: a room you have cleared should look like it, and the bodies are how the
+	 *  player reads what happened while they were somewhere else.
+	 */
 	UPROPERTY(EditAnywhere, Category = "CQB")
-	float DeferredDestructionTime = 6.0f;
+	float DeferredDestructionTime = 0.0f;
 
 	/** Starting health for enemies */
 	UPROPERTY(EditAnywhere, Category = "CQB")
