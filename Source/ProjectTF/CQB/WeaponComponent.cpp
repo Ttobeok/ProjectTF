@@ -1,4 +1,5 @@
 // CQB Sample - hitscan weapon component shared by player and enemies.
+// CQB 샘플 - 플레이어와 적이 함께 쓰는 히트스캔 무기 컴포넌트.
 
 #include "WeaponComponent.h"
 #include "WeaponVisualComponent.h"
@@ -33,6 +34,7 @@ void UWeaponComponent::BeginPlay()
 	Super::BeginPlay();
 
 	// cache the camera of the owner. AI pawns have none and fall back to the pawn view point.
+	// 소유자의 카메라를 캐시합니다. AI 폰은 카메라가 없어 폰 시점으로 대체합니다.
 	if (AActor* Owner = GetOwner())
 	{
 		OwnerCamera = Owner->FindComponentByClass<UCameraComponent>();
@@ -42,6 +44,7 @@ void UWeaponComponent::BeginPlay()
 	OnAmmoChanged.Broadcast(CurrentAmmo, GetMagSize());
 
 	// start from the hip FOV so ADS has something to blend from
+	// 정조준이 보간을 시작할 기준이 있도록 허리 FOV에서 출발합니다
 	if (OwnerCamera)
 	{
 		OwnerCamera->SetFieldOfView(GetWeaponData()->HipFov);
@@ -67,6 +70,7 @@ UWeaponData* UWeaponComponent::GetWeaponData() const
 	}
 
 	// no asset assigned: keep a transient instance around so the weapon works with zero setup
+	// 에셋 미지정: 임시 인스턴스를 들고 있어서 아무 설정 없이도 무기가 동작합니다
 	if (!RuntimeDefaultData)
 	{
 		RuntimeDefaultData = NewObject<UWeaponData>(const_cast<UWeaponComponent*>(this), UWeaponData::StaticClass(), TEXT("RuntimeDefaultWeaponData"));
@@ -97,6 +101,7 @@ void UWeaponComponent::GetViewPoint(FVector& OutLocation, FRotator& OutRotation)
 	APawn* OwnerPawn = Cast<APawn>(Owner);
 
 	// bullets leave from the camera when there is one
+	// 카메라가 있으면 탄은 카메라에서 출발합니다
 	if (OwnerCamera)
 	{
 		OutLocation = OwnerCamera->GetComponentLocation();
@@ -114,6 +119,7 @@ void UWeaponComponent::GetViewPoint(FVector& OutLocation, FRotator& OutRotation)
 	}
 
 	// the controller rotation is a frame fresher than the camera component transform
+	// 컨트롤러 회전이 카메라 컴포넌트 트랜스폼보다 한 프레임 더 최신입니다
 	if (OwnerPawn && OwnerPawn->GetController())
 	{
 		OutRotation = OwnerPawn->GetBaseAimRotation();
@@ -128,6 +134,7 @@ bool UWeaponComponent::CanFire() const
 	}
 
 	// a dead shooter keeps its finger off the trigger
+	// 죽은 사수는 방아쇠에서 손을 뗍니다
 	if (const UHealthComponent* Health = UHealthComponent::FindHealthComponent(GetOwner()))
 	{
 		if (Health->IsDead())
@@ -167,6 +174,7 @@ void UWeaponComponent::Fire()
 	UWeaponData* Data = GetWeaponData();
 
 	// dry fire: kick off a reload instead
+	// 빈 격발: 대신 재장전을 겁니다
 	if (CurrentAmmo <= 0)
 	{
 		DebugMessage(SlotFire, FColor::Orange, FString::Printf(TEXT("[%s] click - out of ammo"), *Owner->GetName()));
@@ -184,6 +192,7 @@ void UWeaponComponent::Fire()
 	GetViewPoint(ViewLocation, ViewRotation);
 
 	// apply the aim cone
+	// 탄 퍼짐 원뿔을 적용합니다
 	FVector ShotDirection = ViewRotation.Vector();
 	if (AimSpreadHalfAngle > 0.0f)
 	{
@@ -205,6 +214,8 @@ void UWeaponComponent::Fire()
 	{
 		// from the muzzle, not the eye: a line from the camera to what the camera is looking at
 		// is seen end on, and a thick one fills the middle of the screen with a coloured slab
+		// 눈이 아니라 총구에서: 카메라에서 카메라가 보는 지점까지 그은 선은 정면으로 보이므로,
+		// 두꺼우면 화면 한가운데가 색 덩어리로 찹니다
 		FVector TracerStart = ViewLocation;
 		if (const UWeaponVisualComponent* Visual = Owner->FindComponentByClass<UWeaponVisualComponent>())
 		{
@@ -215,12 +226,15 @@ void UWeaponComponent::Fire()
 	}
 
 	// damage anything carrying a health component
+	// 체력 컴포넌트를 가진 대상에게 피해를 줍니다
 	if (bHitSomething)
 	{
 		AActor* HitActor = Hit.GetActor();
 
 		// never shoot your own side. The AI aims with a cone, so a squad member crossing the
 		// line of fire is a matter of time rather than an accident.
+		// 같은 편은 절대 쏘지 않습니다. AI는 원뿔로 조준하므로, 분대원이 사선을 가로지르는 건
+		// 사고가 아니라 시간 문제입니다.
 		const bool bFriendly = !FCQBFactions::AreHostile(Owner, HitActor)
 			&& FCQBFactions::GetFaction(HitActor) != ECQBFaction::Neutral;
 
@@ -240,6 +254,9 @@ void UWeaponComponent::Fire()
 			// go through the engine damage pipeline rather than poking the health component
 			// directly, so god mode, damage types and immunity all keep working.
 			// UHealthComponent listens to OnTakeAnyDamage and applies the result.
+			// 체력 컴포넌트를 직접 건드리지 않고 엔진 데미지 파이프라인을 거칩니다. 그래야
+			// God 치트·데미지 타입·면역이 모두 살아 있습니다.
+			// UHealthComponent가 OnTakeAnyDamage를 구독해 결과를 반영합니다.
 			const float DamageDealt = UGameplayStatics::ApplyPointDamage(
 				HitActor, Data->Damage, ShotDirection, Hit, InstigatorController, Owner, nullptr);
 
@@ -262,9 +279,11 @@ void UWeaponComponent::Fire()
 	ApplyRecoil();
 
 	// let the AI hearing sense know a shot went off
+	// 총이 나갔다는 걸 AI 청각에 알립니다
 	UAISense_Hearing::ReportNoiseEvent(World, ViewLocation, Data->NoiseLoudness, Owner, Data->NoiseRange, TEXT("Gunshot"));
 
 	// start the refire cooldown
+	// 재발사 쿨다운을 시작합니다
 	bRefireCooldown = true;
 	World->GetTimerManager().SetTimer(RefireTimerHandle, this, &UWeaponComponent::OnRefireReady, Data->GetShotInterval(), false);
 }
@@ -274,6 +293,7 @@ void UWeaponComponent::OnRefireReady()
 	bRefireCooldown = false;
 
 	// automatic weapons keep going while the trigger is held
+	// 자동 무기는 방아쇠를 누르고 있는 동안 계속 나갑니다
 	if (bTriggerHeld && GetWeaponData()->bAutomatic)
 	{
 		Fire();
@@ -312,6 +332,7 @@ void UWeaponComponent::FinishReload()
 	DebugMessage(SlotReload, FColor::Green, FString::Printf(TEXT("[%s] RELOADED  %d/%d"), *GetNameSafe(GetOwner()), CurrentAmmo, GetMagSize()));
 
 	// keep firing if the trigger is still down
+	// 방아쇠가 아직 눌려 있으면 계속 쏩니다
 	if (bTriggerHeld && GetWeaponData()->bAutomatic)
 	{
 		Fire();
@@ -353,6 +374,7 @@ void UWeaponComponent::ApplyRecoil()
 	OwnerController->SetControlRotation(ControlRotation);
 
 	// remember how much we pushed so it can be pulled back down
+	// 나중에 되돌릴 수 있도록 얼마나 밀었는지 기억해 둡니다
 	AccumulatedRecoil.X += PitchKick;
 	AccumulatedRecoil.Y += YawKick;
 }
@@ -380,6 +402,7 @@ void UWeaponComponent::RecoverRecoil(float DeltaTime)
 	}
 
 	// walk each axis back towards zero and subtract the same amount from the view
+	// 각 축을 0쪽으로 되돌리면서 같은 양만큼 시점에서 뺍니다
 	const FVector2D Recovered(
 		FMath::FInterpConstantTo(AccumulatedRecoil.X, 0.0f, DeltaTime, Data->RecoilRecoverySpeed),
 		FMath::FInterpConstantTo(AccumulatedRecoil.Y, 0.0f, DeltaTime, Data->RecoilRecoverySpeed));
@@ -405,6 +428,7 @@ void UWeaponComponent::UpdateADS(float DeltaTime)
 	const float TargetFov = bIsADS ? Data->ADSFov : Data->HipFov;
 
 	// already settled, so leave the camera alone
+	// 이미 안정됐으므로 카메라를 건드리지 않습니다
 	if (FMath::IsNearlyEqual(OwnerCamera->FieldOfView, TargetFov, 0.01f))
 	{
 		return;
@@ -430,6 +454,7 @@ void UWeaponComponent::DebugMessage(int32 Slot, const FColor& Color, const FStri
 	}
 
 	// stable key per owner and slot so repeated lines replace instead of scrolling away
+	// 소유자·슬롯마다 고정 키를 써서 같은 줄이 흘러가지 않고 교체되게 합니다
 	const int32 Key = (GetOwner() ? static_cast<int32>(GetOwner()->GetUniqueID() % 1000) * 10 : 0) + Slot;
 	GEngine->AddOnScreenDebugMessage(Key, 2.0f, Color, Message);
 }
