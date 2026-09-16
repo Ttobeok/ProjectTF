@@ -397,6 +397,12 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 		BestDot = Dot;
 		AimedDoorway = Doorway;
 	}
+
+	// tell every doorway where it stands, so the highlight follows the crosshair
+	for (TActorIterator<ADoorwayMarker> It(World); It; ++It)
+	{
+		It->SetAimedAt(*It == AimedDoorway);
+	}
 }
 
 TArray<AAllyAIController*> AProjectTFCharacter::GetSquad() const

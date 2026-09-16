@@ -60,11 +60,46 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Doorway")
 	bool bDrawDebug = false;
 
+	/**
+	 *  Told every frame by the player whether its crosshair is on this doorway.
+	 *
+	 *  The marker does not go looking for the player: a doorway that knew about the player
+	 *  character would drag the whole player class into a file that otherwise only knows about
+	 *  points in space.
+	 */
+	void SetAimedAt(bool bInAimedAt) { bAimedAt = bInAimedAt; }
+
+	/** Outline the opening so the player can see which doorways take orders */
+	UPROPERTY(EditAnywhere, Category = "Doorway|Highlight")
+	bool bHighlight = true;
+
+	/** Half the width of the drawn opening, in cm. The level's doorways are 2 m. */
+	UPROPERTY(EditAnywhere, Category = "Doorway|Highlight")
+	float FrameHalfWidth = 88.0f;
+
+	/** Height of the drawn opening, in cm */
+	UPROPERTY(EditAnywhere, Category = "Doorway|Highlight")
+	float FrameHeight = 210.0f;
+
+	/** Colour when the doorway is just sitting there, available */
+	UPROPERTY(EditAnywhere, Category = "Doorway|Highlight")
+	FColor IdleColour = FColor(0, 120, 255);
+
+	/** Colour when the player is aiming at it, matching the hint text on the HUD */
+	UPROPERTY(EditAnywhere, Category = "Doorway|Highlight")
+	FColor AimedColour = FColor(255, 130, 0);
+
 protected:
 
 	virtual void Tick(float DeltaSeconds) override;
 
 	FString GetActorLabelSafe() const;
+
+	/** Draws the opening, and where an order would send the squad */
+	void DrawHighlight(float DeltaSeconds) const;
+
+	/** True while the player's crosshair is on this doorway */
+	bool bAimedAt = false;
 
 	/** Entry direction, drawn in the editor */
 	UPROPERTY(VisibleAnywhere, Category = "Doorway")
