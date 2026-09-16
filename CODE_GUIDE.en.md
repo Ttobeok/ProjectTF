@@ -359,6 +359,15 @@ camera.
 **The level script overwrites the map wholesale.** Once you start hand-editing it, do not run it
 again.
 
+**An AI controller does not outlive its pawn.** It unpossesses and destroys itself the moment the
+pawn dies, so **a list built from controllers cannot show anyone as down** - they vanish from it on
+the next frame. That is why the HUD roster is built from pawns, and why the callsign and element are
+stamped onto the pawn at possession.
+
+**A corpse locks the state machine if you keep referencing it.** Bodies stay where they fall, so if
+the "a dead target ends the fight" rule does not clear the reference, that branch is true on every
+tick from then on and nothing below it runs again. An AI that wins a fight stops for good.
+
 **The cooker cannot follow a soft path that only exists in C++.** This project is
 `bCookMapsOnly=True`, so the cooker starts at `Lvl_CQB` and takes what it can reach by reference.
 The weapon mesh and the animation blueprint exist only as **strings** inside C++
@@ -393,6 +402,7 @@ nothing at all unless an argument asks for something.
 | `-CQBKillEnemyAfter=<s>` | Hit suspects after a delay |
 | `-CQBKillCount=<n>` | How many, nearest the player first. Default 1 |
 | `-CQBKillDamage=<f>` | Fraction of max health. Default 10.0, which is lethal; 0.7 wounds instead |
+| `-CQBKillSide=<side>` | `enemy` (default) or `ally`, for checking the down state on the HUD |
 | `-CQBOrderAfter=<s>` | Issue a squad order after a delay |
 | `-CQBOrder=<name>` | follow / hold / stack / clear / watch / challenge |
 | `-CQBOrderDoor=<n>` | 0 = room A door, 1 = room B door, ordered west to east |
