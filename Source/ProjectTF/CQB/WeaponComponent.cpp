@@ -193,6 +193,25 @@ void UWeaponComponent::Fire()
 	}
 
 	--CurrentAmmo;
+
+	// Claim the cooldown now: the shot is committed, and everything after this can re-enter
+	// Fire(). The damage lands, something dies, the squad reshuffles roles and an AI is told to
+	// start firing - all inside this call. Claiming it at the end of the function let that
+	// second shot through, for double ammo and double damage on one trigger pull.
+	//
+	// It goes here rather than at the top of the function because the dry-fire path above
+	// returns without arming the refire timer, and nothing else clears this flag: claiming it
+	// any earlier means the weapon never fires again after its first empty trigger pull.
+	//
+	// 여기서 쿨다운을 잡습니다. 사격은 이미 확정됐고, 이 아래의 모든 것이 Fire()로 다시
+	// 들어올 수 있습니다. 피해가 들어가고, 누가 죽고, 분대가 역할을 재편성하고, 어떤 AI에게
+	// 사격 시작이 지시되는 일이 전부 이 호출 안에서 벌어집니다. 함수 끝에서 잡으면 그 두 번째
+	// 발사가 통과해 방아쇠 한 번에 탄약과 피해가 두 배로 들어갔습니다.
+	//
+	// 함수 맨 위가 아니라 여기인 이유는, 위쪽 빈 격발 경로가 재발사 타이머를 걸지 않고
+	// 반환하는데 이 플래그를 푸는 곳이 그 타이머뿐이기 때문입니다. 더 일찍 잡으면 첫 빈
+	// 격발 이후로 무기가 영영 발사되지 않습니다.
+	bRefireCooldown = true;
 	OnAmmoChanged.Broadcast(CurrentAmmo, GetMagSize());
 
 	LastFireTime = World->GetTimeSeconds();
@@ -409,15 +428,24 @@ void UWeaponComponent::ApplyRecoil()
 	const float PitchKick = FMath::FRandRange(Data->RecoilPitchMin, Data->RecoilPitchMax);
 	const float YawKick = FMath::FRandRange(Data->RecoilYawMin, Data->RecoilYawMax);
 
-	FRotator ControlRotation = OwnerController->GetControlRotation();
+	const FRotator Before = OwnerController->GetControlRotation();
+
+	FRotator ControlRotation = Before;
 	ControlRotation.Pitch += PitchKick;
 	ControlRotation.Yaw += YawKick;
 	OwnerController->SetControlRotation(ControlRotation);
 
-	// remember how much we pushed so it can be pulled back down
-	// 나중에 되돌릴 수 있도록 얼마나 밀었는지 기억해 둡니다
-	AccumulatedRecoil.X += PitchKick;
-	AccumulatedRecoil.Y += YawKick;
+	// Book what survived, not what was asked for. The controller clamps pitch to its view
+	// limits, so firing while already aimed near vertical banks recoil that never reached the
+	// view - and recovery then pulls the crosshair down below where the player left it.
+	//
+	// 요청한 값이 아니라 실제로 남은 값을 기록합니다. 컨트롤러가 피치를 시야 한계로 자르므로,
+	// 거의 수직으로 조준한 채 쏘면 화면에 반영되지 않은 반동이 장부에 쌓이고, 회복이 그만큼
+	// 조준점을 플레이어가 두고 간 곳보다 아래로 끌어내립니다.
+	const FRotator Applied = OwnerController->GetControlRotation();
+
+	AccumulatedRecoil.X += FRotator::NormalizeAxis(Applied.Pitch - Before.Pitch);
+	AccumulatedRecoil.Y += FRotator::NormalizeAxis(Applied.Yaw - Before.Yaw);
 }
 
 void UWeaponComponent::RecoverRecoil(float DeltaTime)

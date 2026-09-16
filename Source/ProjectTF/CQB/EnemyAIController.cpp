@@ -131,6 +131,23 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 	EnterState(ECQBAIState::Idle);
 }
 
+void AEnemyAIController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// Death and surrender both unregister, but they are not the only ways a controller goes
+	// away: streaming a level out, or a tool destroying the actor, used to leave a stale slot
+	// in the squad that GetSquadSize would still count.
+	//
+	// 사망과 항복은 둘 다 등록을 해제하지만, 컨트롤러가 사라지는 경로가 그 둘만은 아닙니다.
+	// 레벨 스트리밍이나 툴에서의 액터 파괴는 분대에 유령 자리를 남겼고, GetSquadSize는
+	// 그것까지 세고 있었습니다.
+	if (ASquadManager* Squad = GetSquad())
+	{
+		Squad->UnregisterEnemy(this);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 void AEnemyAIController::OnUnPossess()
 {
 	SetFiring(false);
@@ -483,6 +500,22 @@ void AEnemyAIController::ExitState(ECQBAIState State)
 	case ECQBAIState::Cover:		ExitCover(); break;
 	case ECQBAIState::Flank:		ExitFlank(); break;
 	case ECQBAIState::Suppress:		ExitSuppress(); break;
+
+	// Surrender is terminal today - UpdateGlobalTransitions returns on it and ReceiveChallenge
+	// refuses re-entry - but if it ever stops being terminal, leaving bSurrendered set would
+	// produce an AI that can shoot while nobody is allowed to shoot back.
+	//
+	// 지금 Surrender는 종착 상태입니다. UpdateGlobalTransitions가 여기서 반환하고
+	// ReceiveChallenge도 재진입을 막습니다. 다만 언젠가 종착이 아니게 되었을 때
+	// bSurrendered가 켜진 채로 남으면, 자기는 쏘는데 아무도 되쏠 수 없는 AI가 됩니다.
+	case ECQBAIState::Surrender:
+		if (ACQBCharacter* Body = Cast<ACQBCharacter>(GetPawn()))
+		{
+			Body->SetSurrendered(false);
+		}
+		break;
+
+	default: break;
 	}
 }
 

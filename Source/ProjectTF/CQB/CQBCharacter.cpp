@@ -203,9 +203,16 @@ void ACQBCharacter::OnCharacterDeath(AActor* DeadActor, AActor* Killer)
 
 	if (!bRagdollOnDeath)
 	{
-		// nothing worth looking at, so do not leave an empty capsule standing about
-		// 볼 것도 없으니 빈 캡슐을 세워두지 않습니다
-		DeferredDestroy();
+		// Nothing worth looking at, so do not leave an empty capsule standing about - but go
+		// away next tick rather than now. This runs inside OnDeath, which runs inside
+		// ApplyPointDamage, which runs inside UWeaponComponent::Fire; destroying here hands
+		// Fire a pending-kill actor to finish reading.
+		//
+		// 볼 것도 없으니 빈 캡슐을 세워두지 않습니다. 다만 지금이 아니라 다음 틱에 사라집니다.
+		// 이 코드는 OnDeath 안이고, OnDeath는 ApplyPointDamage 안이며, 그것은
+		// UWeaponComponent::Fire 안입니다. 여기서 파괴하면 Fire가 이미 죽은 액터를 계속
+		// 읽게 됩니다.
+		SetLifeSpan(0.01f);
 		return;
 	}
 
