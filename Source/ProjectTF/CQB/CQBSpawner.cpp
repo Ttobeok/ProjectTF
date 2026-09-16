@@ -1,4 +1,5 @@
 // CQB Sample - drops a group of enemies into the level.
+// CQB 샘플 - 레벨에 한 무리를 배치합니다.
 
 #include "CQBSpawner.h"
 #include "CQBCharacter.h"
@@ -26,6 +27,7 @@ ACQBSpawner::ACQBSpawner()
 	CharacterClass = AEnemyCharacter::StaticClass();
 
 	// three enemies holding a room, spread out a little
+	// 방 하나를 지키는 적 세 명. 조금씩 벌려 놓습니다
 	SpawnOffsets.Add(FVector(0.0f, 0.0f, 0.0f));
 	SpawnOffsets.Add(FVector(-250.0f, 300.0f, 0.0f));
 	SpawnOffsets.Add(FVector(-250.0f, -300.0f, 0.0f));
@@ -43,6 +45,7 @@ void ACQBSpawner::BeginPlay()
 	}
 
 	// all the command line driven test hooks live in one actor, not in here
+	// 커맨드라인으로 돌리는 테스트 훅은 여기가 아니라 한 액터에 모여 있습니다
 	ACQBDebugDirector::EnsureExists(this);
 }
 
