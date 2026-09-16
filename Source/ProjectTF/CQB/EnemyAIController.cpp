@@ -34,12 +34,14 @@ AEnemyAIController::AEnemyAIController()
 	AIPerception = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AI Perception"));
 	SetPerceptionComponent(*AIPerception);
 
-	// sight: 2000 cm radius, 70 degree cone
-	// 시야: 반경 2000cm, 70도 원뿔
+	// Sight. The radius and cone are copied across in BeginPlay, not here: a Blueprint subclass
+	// applies its property overrides to the CDO after this constructor has run, so anything read
+	// from SightRadius at this point is the C++ default and a designer's 4000 is silently ignored.
+	//
+	// 시야. 반경과 원뿔각은 여기가 아니라 BeginPlay에서 옮깁니다. 블루프린트 하위 클래스는
+	// 이 생성자가 끝난 뒤에 프로퍼티 오버라이드를 CDO에 적용하므로, 지금 SightRadius를 읽으면
+	// C++ 기본값이고 디자이너가 넣은 4000은 조용히 무시됩니다.
 	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("Sight Config"));
-	SightConfig->SightRadius = SightRadius;
-	SightConfig->LoseSightRadius = SightRadius + 250.0f;
-	SightConfig->PeripheralVisionAngleDegrees = SightAngle;
 	SightConfig->SetMaxAge(5.0f);
 	SightConfig->AutoSuccessRangeFromLastSeenLocation = -1.0f;
 	// no team setup in this sample, so everything is neutral and must still be detected
@@ -51,7 +53,6 @@ AEnemyAIController::AEnemyAIController()
 	// hearing: picks up the gunshot noise events reported by UWeaponComponent
 	// 청각: UWeaponComponent가 보고하는 총성 노이즈 이벤트를 받습니다
 	HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("Hearing Config"));
-	HearingConfig->HearingRange = HearingRange;
 	HearingConfig->SetMaxAge(5.0f);
 	HearingConfig->DetectionByAffiliation.bDetectEnemies = true;
 	HearingConfig->DetectionByAffiliation.bDetectNeutrals = true;
@@ -81,6 +82,30 @@ AEnemyAIController::AEnemyAIController()
 void AEnemyAIController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	ApplySenseTuning();
+}
+
+void AEnemyAIController::ApplySenseTuning()
+{
+	if (SightConfig)
+	{
+		SightConfig->SightRadius = SightRadius;
+		SightConfig->LoseSightRadius = SightRadius + LoseSightMargin;
+		SightConfig->PeripheralVisionAngleDegrees = SightAngle;
+	}
+
+	if (HearingConfig)
+	{
+		HearingConfig->HearingRange = HearingRange;
+	}
+
+	// the sense system caches these, so it has to be told they moved
+	// 감각 시스템이 이 값들을 캐시하므로, 바뀌었다고 알려주어야 합니다
+	if (AIPerception)
+	{
+		AIPerception->RequestStimuliListenerUpdate();
+	}
 }
 
 void AEnemyAIController::OnPossess(APawn* InPawn)

@@ -10,7 +10,6 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "WeaponVisualComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "NavigationInvokerComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
@@ -55,6 +54,7 @@ ACQBCharacter::ACQBCharacter()
 	// 조준은 AI 컨트롤러가 쥐고 있으므로 반동이 이를 방해하면 안 되고, 메시지는 플레이어 HUD에만 갑니다
 	WeaponComponent->bApplyRecoilToController = false;
 	WeaponComponent->bShowDebugMessages = false;
+	WeaponComponent->bDrawDebugTrace = false;
 	WeaponComponent->AimSpreadHalfAngle = AimSpreadHalfAngle;
 
 	// face the direction the AI controller is aiming at
@@ -98,6 +98,16 @@ void ACQBCharacter::BeginPlay()
 		EnemyWeapon->bAutomatic = true;
 
 		WeaponComponent->WeaponData = EnemyWeapon;
+	}
+
+	// Spread belongs to the shooter, not to the weapon profile, so it is applied whether or not
+	// a WeaponData asset was assigned. Inside the block above it was a dead knob for any pawn
+	// that had one.
+	//
+	// 탄 퍼짐은 무기 프로파일이 아니라 사수의 것이므로, WeaponData 에셋 유무와 무관하게
+	// 적용합니다. 위 블록 안에 있을 때는 에셋을 지정한 폰에서 동작하지 않는 값이었습니다.
+	if (WeaponComponent)
+	{
 		WeaponComponent->AimSpreadHalfAngle = AimSpreadHalfAngle;
 	}
 

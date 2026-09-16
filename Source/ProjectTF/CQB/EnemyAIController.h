@@ -352,6 +352,22 @@ protected:
 	//~ Tuning
 
 	/**
+	 *  Copies the tuning properties below into the sense configs. Called from BeginPlay, because
+	 *  a Blueprint subclass has not applied its overrides yet when the constructor runs.
+	 *
+	 *  아래 튜닝 값들을 감각 설정에 복사합니다. BeginPlay에서 부릅니다. 생성자가 도는 시점에는
+	 *  블루프린트 하위 클래스의 오버라이드가 아직 적용되지 않았기 때문입니다.
+	 */
+	void ApplySenseTuning();
+
+	/**
+	 *  How far past SightRadius a target has to get before it is dropped, in cm
+	 *  이미 본 대상을 놓치기까지 SightRadius를 얼마나 넘어가야 하는지(cm)
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Perception")
+	float LoseSightMargin = 250.0f;
+
+	/**
 	 *  Sight radius in cm
 	 *  시야 반경(cm)
 	 */

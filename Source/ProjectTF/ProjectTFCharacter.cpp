@@ -23,7 +23,6 @@
 #include "TimerManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
-#include "NavigationInvokerComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
 

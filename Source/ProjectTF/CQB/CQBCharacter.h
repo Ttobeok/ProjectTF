@@ -13,7 +13,6 @@ class UHealthComponent;
 class UWeaponComponent;
 class UWeaponVisualComponent;
 class UAnimInstance;
-class UNavigationInvokerComponent;
 
 /**
  *  The pawn both AI sides are built on.
@@ -54,13 +53,6 @@ class PROJECTTF_API ACQBCharacter : public ACharacter, public ICQBFactionAgent, 
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UWeaponVisualComponent* WeaponVisual;
-
-	/**
-	 *  Keeps navmesh tiles generated around this character at runtime
-	 *  런타임에 이 캐릭터 주변 navmesh 타일이 유지되도록 합니다
-	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
-	UNavigationInvokerComponent* NavigationInvoker;
 
 public:
 

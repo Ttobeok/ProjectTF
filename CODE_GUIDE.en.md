@@ -51,7 +51,6 @@ need to open.
    ACQBCharacter ───┬── UHealthComponent           shared with the player
   (Faction=Neutral) ├── UWeaponComponent           shared with the player
         ▲           ├── UWeaponVisualComponent
-        │           └── UNavigationInvokerComponent
         │
         ├── AEnemyCharacter   Faction = Enemy,  AIController = AEnemyAIController
         └── AAllyCharacter    Faction = Ally,   AIController = AAllyAIController
@@ -311,7 +310,7 @@ re-requests.
 
 | File | What changed |
 |---|---|
-| `ProjectTFCharacter.h/.cpp` | Health/Weapon/WeaponVisual/NavInvoker components, fire/ADS/reload/lean input, squad order input, faction and sight-target interfaces |
+| `ProjectTFCharacter.h/.cpp` | Health/Weapon/WeaponVisual components, fire/ADS/reload/lean input, squad order input, faction and sight-target interfaces |
 | `ProjectTFCameraManager.cpp` | Applies lean (roll plus a lateral offset) to the final POV in `UpdateViewTarget()` |
 | `ProjectTFPlayerController.h/.cpp` | `ClientSetHUD(ACQBHUD)` in `BeginPlay`, team id |
 

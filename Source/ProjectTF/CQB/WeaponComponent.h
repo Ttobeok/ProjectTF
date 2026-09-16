@@ -55,18 +55,23 @@ public:
 	bool bApplyRecoilToController = true;
 
 	/**
-	 *  Print fire / hit / reload messages in the top left corner
-	 *  발사·명중·재장전 메시지를 화면 좌상단에 표시
+	 *  Print fire / hit / reload messages in the top left corner.
+	 *  Off by default: the sample ships as a Development build so the AI state text survives, so
+	 *  anything left on here is printed over the real HUD eight times a second.
+	 *
+	 *  발사·명중·재장전 메시지를 화면 좌상단에 표시합니다.
+	 *  기본은 꺼짐입니다. AI 상태 표시를 살리려고 Development로 납품하므로, 켜두면 초당
+	 *  여덟 번씩 실제 HUD 위에 찍힙니다.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
-	bool bShowDebugMessages = true;
+	bool bShowDebugMessages = false;
 
 	/**
-	 *  Draw the bullet trace and impact point in the world
-	 *  탄도와 명중 지점을 월드에 그리기
+	 *  Draw the bullet trace and impact point in the world. Off by default, for the same reason.
+	 *  탄도와 명중 지점을 월드에 그립니다. 같은 이유로 기본은 꺼짐입니다.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
-	bool bDrawDebugTrace = true;
+	bool bDrawDebugTrace = false;
 
 	UPROPERTY(BlueprintAssignable, Category = "Weapon")
 	FOnAmmoChangedSignature OnAmmoChanged;

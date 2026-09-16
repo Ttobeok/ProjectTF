@@ -18,7 +18,6 @@ class UWeaponComponent;
 class UWeaponVisualComponent;
 class ADoorwayMarker;
 class AAllyAIController;
-class UNavigationInvokerComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -69,13 +68,6 @@ class AProjectTFCharacter : public ACharacter, public ICQBFactionAgent, public I
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UWeaponVisualComponent* WeaponVisual;
-
-	/**
-	 *  Keeps navmesh tiles generated around this character at runtime
-	 *  런타임에 이 캐릭터 주변 navmesh 타일이 유지되도록 합니다
-	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
-	UNavigationInvokerComponent* NavigationInvoker;
 
 protected:
 

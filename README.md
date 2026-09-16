@@ -121,7 +121,6 @@ Source/ProjectTF/
 │   ├── UHealthComponent                              체력
 │   ├── UWeaponComponent                              히트스캔 무기
 │   ├── UStaticMeshComponent                          1인칭 라이플 (HandGrip_R 소켓)
-│   ├── UNavigationInvokerComponent                   주변 NavMesh 타일 생성
 │   └── 입력: Fire / ADS / Reload / Lean(Q,E)
 ├── ProjectTFCameraManager    (APlayerCameraManager)  린을 최종 POV에 적용
 ├── ProjectTFPlayerController                         CQBHUD 강제 적용
@@ -308,8 +307,10 @@ NavMesh도 Dynamic 생성인데 **타일이 0개 생성되는** 문제가 있었
 불가능합니다 — 커맨드릿은 navigation build lock을 겁니다
 (`Navigation NOT building because navigation build is locked`).
 
-그래서 **Navigation Invoker**로 전환했습니다. 플레이어와 적이 `UNavigationInvokerComponent`를
-들고 있고, 주변 타일이 로드 시 생성됩니다(이 레벨 기준 약 1.3초).
+해결은 **런타임 빌드를 직접 요청**하는 것이었습니다. `ACQBSpawner::EnsureNavigationBuilt()`가
+첫 BeginPlay에서 자기 위치를 navmesh에 투영해 보고, 실패하면 초기 빌드 잠금을 풀고 bounds 볼륨을
+다시 알린 뒤 `Build()`를 부릅니다. 약 1초 뒤 타일이 생깁니다.
+(`bGenerateNavigationOnlyAroundNavigationInvokers`는 **False**입니다. True로 두면 타일이 0개입니다.)
 
 그 지연이 두 번째 버그를 드러냈습니다: 타일 생성 전에 나간 이동 요청이 실패하는데,
 상태머신이 **실패를 "도착"으로 처리**해서 적이 포기하고 Idle로 돌아갔습니다.

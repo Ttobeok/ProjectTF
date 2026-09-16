@@ -58,15 +58,24 @@ void ACQBSpawner::EnsureNavigationBuilt()
 		return;
 	}
 
-	// Tiles are generated around the navigation invokers the characters carry, which takes about
-	// a second after the level loads.
+	// The navmesh covers the whole bounds volume and is generated at runtime; there are no
+	// navigation invokers involved, and bGenerateNavigationOnlyAroundNavigationInvokers is off.
 	//
-	// Do not call Build() here. With invoker driven generation a full rebuild wipes the tiles the
-	// invokers have produced and starts over, so asking for one on BeginPlay - before any invoker
-	// has had a chance to run - leaves the level with no navmesh at all. Move orders issued in the
-	// meantime are retried by the AI controller until the tiles arrive.
-	// Invoker driven generation still needs one kick to produce the first tiles: the octree
-	// exists, the bounds are registered, but nothing has asked for a build yet.
+	// The level ships without baked navigation data, because a commandlet cannot produce any -
+	// it holds the navigation build lock. So on the first BeginPlay the octree exists and the
+	// bounds are registered, but nothing has asked for a build. If the spawner cannot project
+	// its own position onto the navmesh, that is what has happened: drop the initial build lock,
+	// re-announce every bounds volume and ask for the build. It takes about a second, and move
+	// orders issued in the meantime are retried by the AI controller until the tiles arrive.
+	//
+	// navmesh는 bounds 볼륨 전체를 덮으며 런타임에 생성됩니다. 내비게이션 인보커는 관여하지
+	// 않고, bGenerateNavigationOnlyAroundNavigationInvokers도 꺼져 있습니다.
+	//
+	// 레벨에는 구워진 내비게이션 데이터가 없습니다. 커맨드릿이 내비게이션 빌드 잠금을 쥐고
+	// 있어서 만들 수가 없기 때문입니다. 그래서 첫 BeginPlay 시점에는 옥트리와 bounds는 있지만
+	// 아무도 빌드를 요청하지 않은 상태입니다. 스포너가 자기 위치를 navmesh에 투영하지 못하면
+	// 그 상황이라는 뜻이니, 초기 빌드 잠금을 풀고 bounds 볼륨을 다시 알린 뒤 빌드를 요청합니다.
+	// 약 1초 걸리며, 그 사이에 나간 이동 명령은 AI 컨트롤러가 재시도합니다.
 	FNavLocation Projected;
 	if (!NavSys->ProjectPointToNavigation(GetActorLocation(), Projected, FVector(300.0f, 300.0f, 500.0f)))
 	{

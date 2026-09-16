@@ -47,7 +47,6 @@
    ACQBCharacter ───┬── UHealthComponent      플레이어와 공용
     (Faction=Neutral)├── UWeaponComponent      플레이어와 공용
         ▲            ├── UWeaponVisualComponent
-        │            └── UNavigationInvokerComponent
         │
         ├── AEnemyCharacter   Faction = Enemy,  AIController = AEnemyAIController
         └── AAllyCharacter    Faction = Ally,   AIController = AAllyAIController
@@ -280,7 +279,7 @@ HUD 힌트는 이미 조준한 뒤에야 뜨므로, 문을 찾으려면 방을 �
 
 | 파일 | 무엇을 |
 |---|---|
-| `ProjectTFCharacter.h/.cpp` | Health/Weapon/WeaponVisual/NavInvoker 컴포넌트, Fire·ADS·Reload·Lean 입력, 분대 명령 입력, 진영·시야타깃 인터페이스 |
+| `ProjectTFCharacter.h/.cpp` | Health/Weapon/WeaponVisual 컴포넌트, Fire·ADS·Reload·Lean 입력, 분대 명령 입력, 진영·시야타깃 인터페이스 |
 | `ProjectTFCameraManager.cpp` | `UpdateViewTarget()`에서 린(roll + 측면 오프셋)을 최종 POV에 적용 |
 | `ProjectTFPlayerController.h/.cpp` | `BeginPlay`에서 `ClientSetHUD(ACQBHUD)`, 팀 ID |
 
