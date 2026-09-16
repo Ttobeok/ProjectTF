@@ -3,6 +3,8 @@
 이 샘플의 C++를 읽는 순서와, 각 파일에서 봐야 할 지점을 정리했습니다.
 게임 로직은 전부 `Source/ProjectTF/CQB/` 안에 있고, 템플릿 파일은 3개만 수정했습니다.
 
+> 영어판: [CODE_GUIDE.en.md](CODE_GUIDE.en.md). 두 문서는 같은 내용으로 맞춰 둡니다.
+
 한 줄 요약: **적 AI와 아군 분대가 같은 상태머신을 쓰고, 진영만 다릅니다.**
 
 ---
@@ -92,6 +94,8 @@ SetTimer()         FireRate 기반 다음 발사
 - `GetViewPoint()` — 플레이어는 카메라, AI는 폰 시점. 같은 컴포넌트를 양쪽이 쓰는 핵심
 - `ApplyRecoil()` / `RecoverRecoil()` — 반동을 컨트롤러 회전에 더하고, 미발사 시 같은 양을 빼서 복구
 - `GetWeaponData()` — 에셋이 없으면 런타임 기본값 생성. 에셋 없이도 동작하는 이유
+- 예광선은 트레이스 시작점(눈)이 아니라 **총구**에서 그립니다. 카메라에서 카메라가 보는 지점까지
+  그은 두꺼운 선은 정면으로 보여서, 화면 한가운데에 색 덩어리로 렌더됩니다
 
 ---
 
@@ -161,6 +165,8 @@ EQS 에셋 없이 동작하는 엄폐 탐색. NavMesh 24지점 샘플링 → 플
 순환합니다. 명령은 선택된 element에만 갑니다 — Blue가 문에 스택하는 동안 Red는 복도를 지키는 식.
 `AAllyAIController::OnPossess()`가 짝/홀로 element를 배정하고 `RED_1` ~ `BLU_2`로 이름을 붙입니다.
 
+분대원은 **element 색 옷을 입습니다** — 연한 빨강/파랑. element를 정하는 그 `OnPossess`에서
+같이 칠하므로 색과 호출부호가 어긋날 수 없습니다. 용의자는 회색 그대로입니다.
 명령이 떨어지면 **바닥에 element 색 링**이 4초간 그려집니다 (`DrawOrderMarker`).
 
 ### 명령과 전투의 관계
@@ -238,6 +244,13 @@ GetClearPoint()             문 너머 450cm
 
 **좌우 오프셋이 55cm인 이유:** 복도 폭이 2m라 100cm를 쓰면 정확히 벽입니다.
 
+**문을 칠하는 이유:** 어느 개구부에 명령을 내릴 수 있는지 화면에 아무 표시가 없었습니다.
+HUD 힌트는 이미 조준한 뒤에야 뜨므로, 문을 찾으려면 방을 훑으며 글자가 뜨기를 기다려야 했습니다.
+지금은 마커가 개구부를 그립니다 — 평소엔 얇은 파란 테두리, 조준하면 굵은 주황. 조준 중에는
+좌우 스택 지점에 구, 그리고 Clear가 보낼 방 안 지점까지 선을 그립니다. 조준 여부는
+`UpdateAimedDoorway`가 **알려줍니다** — 문이 플레이어 폰을 찾아가면 좌표만 알면 되는 파일에
+플레이어 클래스가 딸려 들어옵니다.
+
 **콜리전이 없는 이유 (중요):** 처음엔 조준용 박스를 달았는데, 그 박스가 `ECC_Visibility`를
 막았습니다. **AI Sight가 같은 채널을 씁니다.** 문에 마커를 놓으면 그 문을 지나는
 모든 AI 시야가 차단됐습니다. 지금은 `AProjectTFCharacter::UpdateAimedDoorway()`가
@@ -310,6 +323,13 @@ GetClearPoint()             문 너머 450cm
 **`SetVisibility(false, true)`는 자식까지 숨깁니다.** 카메라의 자식인 무기까지 사라집니다.
 
 **레벨 스크립트는 맵을 통째로 덮어씁니다.** 손으로 다듬기 시작했으면 다시 돌리면 안 됩니다.
+
+**`DrawDebug*`의 수명은 초 단위인데 `DeltaSeconds`를 넘기면 그려지기 전에 만료됩니다.**
+호출이 아무 일도 안 하는 것처럼 보입니다. 한 프레임만 그리려면 `-1`입니다.
+
+**UI 없이 찍은 스크린샷에는 디버그 텍스트가 안 담깁니다.** `DrawDebugString`은 HUD의
+`DebugCanvas`에 그려지는데 `RequestScreenshot(false)`가 그걸 버립니다. HUD 캔버스는 그대로
+나오므로 스크린샷은 멀쩡해 보이고, 정작 확인하려던 것만 빠집니다.
 
 **쿠커는 C++ 소프트 경로를 못 따라갑니다.** 이 프로젝트는 `bCookMapsOnly=True`라
 쿠커가 `Lvl_CQB`에서 출발해 참조를 타고 갈 수 있는 것만 담습니다. 그런데 무기 메시와
@@ -431,6 +451,10 @@ RED_1/2, BLU_1/2  Follow -> Watch   →  전원 "Watching that"
 | 순응 가중치 (항복 난이도) | `BP_EnemyAIController`의 Compliance* 6개 | 없음 |
 | AI 인지·전투 타이밍 | `BP_EnemyAIController` | 없음 |
 | 아군 명령 거리·시간 | `BP_AllyAIController` (AAllyAIController 상속) | 없음 |
+| element 색 | `BP_AllyAIController`의 `RedTint` / `BlueTint` | 없음 |
+| 이동 속도 | 캐릭터 BP의 Character Movement → Max Walk Speed | 없음 |
+| 시체 유지 시간 | 캐릭터 BP의 `DeferredDestructionTime`. 0이면 계속 남음 | 없음 |
+| 문 표시 색·크기 | 레벨의 `DoorwayMarker` → Doorway\|Highlight | 없음 |
 | 분대 측면거리·콜아웃 | 레벨에 배치한 `SquadManager` | 없음 |
 | 문 위치·스택 지점 | 레벨의 `DoorwayMarker` (`bDrawDebug`로 확인) | 없음 |
 | 적/아군 수·위치 | 레벨의 `EnemySpawner` / `AllySpawner` (둘 다 `ACQBSpawner`) | 없음 |
@@ -468,3 +492,4 @@ Blueprint Class → AEnemyCharacter     → BP_Enemy
 - **적 프로파일을 BP 없이 못 바꿈** — 위 표대로 BP 껍데기를 한 번 만들어야 인스펙터가 열립니다.
 - **애니메이션이 템플릿 그대로** — 사격·피격·항복 자세가 전용 몽타주가 아니라 캡슐 높이 조절과
   무기 숨김으로 표현됩니다. 로직은 맞고 보이는 것만 임시입니다.
+- **사운드가 전혀 없습니다.** 이 프로젝트는 소리를 하나도 재생하지 않습니다.
