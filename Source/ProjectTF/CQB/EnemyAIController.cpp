@@ -89,12 +89,9 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 
 	// join the squad and take a name. The player's own squad is commanded directly instead.
 	// 분대에 들어가고 이름을 받습니다. 플레이어 직속 분대는 대신 직접 지휘를 받습니다.
-	if (ShouldJoinSquad())
+	if (ASquadManager* Squad = GetSquad())
 	{
-		if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
-		{
-			Squad->RegisterEnemy(this);
-		}
+		Squad->RegisterEnemy(this);
 	}
 
 	if (UHealthComponent* Health = GetHealth())
@@ -203,7 +200,7 @@ void AEnemyAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus
 			{
 				bHasSeenPlayerOnce = true;
 
-				if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+				if (ASquadManager* Squad = GetSquad())
 				{
 					Squad->Broadcast(ECalloutType::Contact, this);
 				}
@@ -284,6 +281,31 @@ void AEnemyAIController::Tick(float DeltaTime)
 	DrawStateDebug(DeltaTime);
 }
 
+ASquadManager* AEnemyAIController::GetSquad() const
+{
+	if (!ShouldJoinSquad())
+	{
+		return nullptr;
+	}
+
+	if (!CachedSquad.IsValid())
+	{
+		// the one place that may call the static lookup directly
+		// 정적 조회를 직접 불러도 되는 유일한 자리입니다
+		CachedSquad = ASquadManager::GetSquadManager(this);
+	}
+
+	return CachedSquad.Get();
+}
+
+void AEnemyAIController::OnTargetLost()
+{
+	if (CurrentState != ECQBAIState::Idle)
+	{
+		SetState(ECQBAIState::Idle);
+	}
+}
+
 void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 {
 	// giving up is final for the rest of the encounter
@@ -293,18 +315,24 @@ void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 		return;
 	}
 
-	// a dead target ends the fight
-	// 대상이 죽으면 전투도 끝납니다
+	// A dead target ends the fight. Forgetting it matters as much as the state change: bodies
+	// stay where they fall, so a target that is still referenced keeps this branch true on every
+	// tick from now on, and the transitions below it are never reached again.
+	//
+	// 대상이 죽으면 전투도 끝납니다. 상태를 바꾸는 것만큼이나 그 대상을 잊는 것이 중요합니다.
+	// 시체는 그 자리에 남으므로, 참조를 들고 있으면 이 분기가 매 틱 참이 되어 아래의 전이
+	// 규칙에 다시는 도달하지 못합니다.
 	if (CurrentTarget)
 	{
-		if (const UHealthComponent* PlayerHealth = UHealthComponent::FindHealthComponent(CurrentTarget))
+		if (const UHealthComponent* TargetHealth = UHealthComponent::FindHealthComponent(CurrentTarget))
 		{
-			if (PlayerHealth->IsDead())
+			if (TargetHealth->IsDead())
 			{
-				if (CurrentState != ECQBAIState::Idle)
-				{
-					SetState(ECQBAIState::Idle);
-				}
+				CurrentTarget = nullptr;
+				bHasLineOfSight = false;
+				TimeWithoutLineOfSight = 0.0f;
+
+				OnTargetLost();
 				return;
 			}
 		}
@@ -334,7 +362,7 @@ void AEnemyAIController::UpdateGlobalTransitions(float DeltaTime)
 
 		if (TimeWithoutLineOfSight >= LoseSightGraceTime)
 		{
-			if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+			if (ASquadManager* Squad = GetSquad())
 			{
 				Squad->Broadcast(ECalloutType::LostVisual, this);
 			}

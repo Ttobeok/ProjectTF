@@ -46,7 +46,7 @@ void AEnemyAIController::OnSquadRolesInvalidated()
 		// 이미 교전 중입니다. 그 자리에서 새 역할만 받아들입니다
 		TimeInState = 0.0f;
 
-		if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+		if (ASquadManager* Squad = GetSquad())
 		{
 			SquadRole = Squad->RequestRole(this);
 		}
@@ -65,7 +65,7 @@ void AEnemyAIController::OnPawnDied(AActor* DeadActor, AActor* Killer)
 
 	// tell the squad before leaving it, so the others hear Man down and get new roles
 	// 분대를 떠나기 전에 알립니다. 그래야 나머지가 Man down을 듣고 새 역할을 받습니다
-	if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+	if (ASquadManager* Squad = GetSquad())
 	{
 		Squad->NotifyEnemyDied(this);
 	}
@@ -125,9 +125,16 @@ float AEnemyAIController::EvaluateCompliance(const AActor* Challenger) const
 		Pressure += ComplianceIsolationWeight;
 	}
 
-	// caught out of cover with a weapon pointed at you
-	// 엄폐 밖에서 총구를 들이밀린 상황
-	if (!bHasLineOfSight)
+	// Caught out of cover with a weapon pointed at you. This asks whether the challenger can be
+	// seen, not whether the combat target can: bHasLineOfSight tracks CurrentTarget, which is
+	// usually nobody at the moment someone shouts, and reading it here made a healthy suspect
+	// impossible to talk down at any range.
+	//
+	// 엄폐 밖에서 총구를 들이밀린 상황입니다. 여기서 묻는 것은 "외치는 사람이 보이는가"이지
+	// "교전 대상이 보이는가"가 아닙니다. bHasLineOfSight는 CurrentTarget을 추적하는데 누가
+	// 외치는 시점에는 보통 대상이 없고, 그 값을 읽는 바람에 만체력 용의자는 아무리 가까이서
+	// 외쳐도 설득할 수 없었습니다.
+	if (!LineOfSightTo(Challenger))
 	{
 		Pressure -= ComplianceBlindPenalty;
 	}
@@ -144,7 +151,7 @@ bool AEnemyAIController::ReceiveChallenge(AActor* Challenger, float Pressure)
 
 	const float Total = EvaluateCompliance(Challenger) + Pressure;
 
-	ASquadManager* Squad = ASquadManager::GetSquadManager(this);
+	ASquadManager* Squad = GetSquad();
 
 	if (Total < ComplianceThreshold)
 	{

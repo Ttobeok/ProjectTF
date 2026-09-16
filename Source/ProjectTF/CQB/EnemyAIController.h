@@ -14,6 +14,7 @@ class UAISenseConfig_Hearing;
 class UEnvQuery;
 class UWeaponComponent;
 class UHealthComponent;
+class ASquadManager;
 struct FAIStimulus;
 struct FEnvQueryResult;
 
@@ -237,8 +238,28 @@ protected:
 	void OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
 	/**
+	 *  The squad this controller answers to, or null for anyone who does not join one.
+	 *
+	 *  Every squad call goes through here rather than ASquadManager::GetSquadManager, because an
+	 *  ally reaching into the enemy squad hands the opposition a free role reshuffle every time a
+	 *  squad member dies. Looked up once; the lookup walks every actor in the world.
+	 *
+	 *  이 컨트롤러가 속한 분대. 분대에 들어가지 않는 쪽에는 null입니다.
+	 *
+	 *  분대 호출은 전부 여기를 거칩니다. 아군이 적 분대를 건드리면 아군이 죽을 때마다
+	 *  적이 공짜로 역할을 재편성하게 됩니다. 조회는 한 번만 합니다 — 월드 전체를 훑기 때문입니다.
+	 */
+	ASquadManager* GetSquad() const;
+
+	/**
+	 *  The current target died. An enemy stands down; an ally goes back to its standing order.
+	 *  현재 대상이 죽었습니다. 적은 대기로, 아군은 받아둔 명령으로 돌아갑니다.
+	 */
+	virtual void OnTargetLost();
+
+	/**
 	 *  True when the actor belongs to a faction this one shoots at
-	 *  그 액터가 이쪽이 쓰는 진영에 속하면 true
+	 *  그 액터가 이쪽이 쏘는 진영에 속하면 true
 	 */
 	bool IsHostile(const AActor* Actor) const;
 
@@ -489,6 +510,12 @@ protected:
 	ESquadRole SquadRole = ESquadRole::None;
 
 	FString DisplayName = TEXT("Enemy");
+
+	/**
+	 *  Squad manager, looked up once. GetSquadManager walks every actor in the world.
+	 *  분대 매니저. 한 번만 찾습니다. GetSquadManager는 월드의 모든 액터를 훑습니다.
+	 */
+	mutable TWeakObjectPtr<ASquadManager> CachedSquad;
 
 	/**
 	 *  The player pawn, once perceived

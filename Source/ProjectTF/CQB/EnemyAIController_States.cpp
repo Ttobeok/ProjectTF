@@ -90,7 +90,7 @@ void AEnemyAIController::EnterEngage()
 	// 이 적이 뭔 해야 하는지 분대에 묻습니다
 	if (SquadRole == ESquadRole::None)
 	{
-		if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+		if (ASquadManager* Squad = GetSquad())
 		{
 			SquadRole = Squad->RequestRole(this);
 		}
@@ -173,7 +173,7 @@ void AEnemyAIController::EnterFlank()
 		SetFocus(CurrentTarget, EAIFocusPriority::Gameplay);
 	}
 
-	ASquadManager* Squad = ASquadManager::GetSquadManager(this);
+	ASquadManager* Squad = GetSquad();
 	if (!Squad || !CurrentTarget)
 	{
 		SetState(ECQBAIState::Cover);
@@ -223,7 +223,7 @@ void AEnemyAIController::EnterSuppress()
 	SuppressPhaseTime = 0.0f;
 	SetFiring(true);
 
-	if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+	if (ASquadManager* Squad = GetSquad())
 	{
 		Squad->Broadcast(ECalloutType::Suppressing, this);
 	}
@@ -271,7 +271,7 @@ void AEnemyAIController::EnterSurrender()
 	// 항복한 분대원은 들고 있던 역할을 내놓습니다
 	if (SquadRole != ESquadRole::None)
 	{
-		if (ASquadManager* Squad = ASquadManager::GetSquadManager(this))
+		if (ASquadManager* Squad = GetSquad())
 		{
 			Squad->NotifyEnemyDied(this);
 		}

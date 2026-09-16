@@ -145,6 +145,13 @@ protected:
 	ECQBFaction Faction = ECQBFaction::Neutral;
 
 	/**
+	 *  Capsule half height while kneeling with hands up, in cm
+	 *  손을 들고 무릎 꿇은 상태의 캐슐 반지름(cm)
+	 */
+	UPROPERTY(EditAnywhere, Category = "CQB")
+	float SurrenderedCapsuleHalfHeight = 48.0f;
+
+	/**
 	 *  Ragdoll on death when true, plain Destroy otherwise
 	 *  true면 사망 시 래그돌, 아니면 그냥 Destroy
 	 */

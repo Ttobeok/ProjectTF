@@ -238,8 +238,20 @@ void ACQBCharacter::SetSurrendered(bool bInSurrendered)
 		WeaponVisual->SetVisibility(!bSurrendered, true);
 	}
 
-	// crouch reads as hands up well enough without an animation for it
-	// 전용 애니메이션 없이도 앉은 자세면 손 든 것으로 충분히 읽힙니다
+	// Crouch reads as hands up well enough without an animation for it. The capsule has to come
+	// down with the mesh: dropping the mesh alone put the feet through the floor and left the
+	// hitbox standing at full height, so a surrendered suspect could be killed by shooting the
+	// empty air half a metre above his head.
+	//
+	// 전용 애니메이션 없이도 앉은 자세면 손 든 것으로 충분히 읽힙니다. 다만 캡슐도 같이
+	// 내려와야 합니다. 메시만 내렸더니 발이 바닥을 뚫고, 히트박스는 선 키 그대로 남아서,
+	// 항복한 용의자를 머리 위 50cm 빈 공중을 쏴서 죽일 수 있었습니다.
+	const float StandingHalfHeight = GetClass()->GetDefaultObject<ACQBCharacter>()->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+	const float TargetHalfHeight = bSurrendered ? SurrenderedCapsuleHalfHeight : StandingHalfHeight;
+
+	GetCapsuleComponent()->SetCapsuleHalfHeight(TargetHalfHeight, true);
+	GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -TargetHalfHeight));
+
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
 		Movement->StopMovementImmediately();
@@ -247,12 +259,10 @@ void ACQBCharacter::SetSurrendered(bool bInSurrendered)
 		if (bSurrendered)
 		{
 			Movement->DisableMovement();
-			GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -150.0f));
 		}
 		else
 		{
 			Movement->SetMovementMode(MOVE_Walking);
-			GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
 		}
 	}
 }

@@ -182,6 +182,11 @@ void AAllyAIController::ExitState(ECQBAIState State)
 	}
 }
 
+void AAllyAIController::OnTargetLost()
+{
+	SetState(StandingOrder);
+}
+
 void AAllyAIController::UpdateGlobalTransitions(float DeltaTime)
 {
 	DrawOrderMarker(DeltaTime);
@@ -200,6 +205,11 @@ void AAllyAIController::UpdateGlobalTransitions(float DeltaTime)
 		// Clear는 자기 자리에서 싸웁니다. 방으로 들어가는 것 자체가 명령이기 때문입니다
 		if (bHasLineOfSight && CurrentState != ECQBAIState::Clear)
 		{
+			// the order path never reaches Super, which is where this is normally cleared, so a
+			// stale value left over from the last disengagement would expire the grace instantly
+			// 명령 경로는 Super에 도달하지 않는데 이 값은 거기서 초기화됩니다. 지난번 교전
+			// 이탈 때 남은 값을 그대로 두면 유예가 즉시 만료됩니다
+			TimeWithoutLineOfSight = 0.0f;
 			SetState(ECQBAIState::Engage);
 		}
 

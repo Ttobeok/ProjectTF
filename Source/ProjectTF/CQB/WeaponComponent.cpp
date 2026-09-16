@@ -3,6 +3,7 @@
 
 #include "WeaponComponent.h"
 #include "WeaponVisualComponent.h"
+#include "CQBCharacter.h"
 #include "WeaponData.h"
 #include "HealthComponent.h"
 #include "CQBTypes.h"
@@ -235,8 +236,19 @@ void UWeaponComponent::Fire()
 		// line of fire is a matter of time rather than an accident.
 		// 같은 편은 절대 쏘지 않습니다. AI는 원뿔로 조준하므로, 분대원이 사선을 가로지르는 건
 		// 사고가 아니라 시간 문제입니다.
-		const bool bFriendly = !FCQBFactions::AreHostile(Owner, HitActor)
-			&& FCQBFactions::GetFaction(HitActor) != ECQBFaction::Neutral;
+		// Someone who has put their hands up is out of the fight for everyone. The AI already
+		// stops aiming at them, but a 4 degree cone at room distance is wide enough to catch a
+		// kneeling suspect standing next to a live one, so the shot has to be refused here too.
+		//
+		// 손을 든 사람은 모두에게 전투 밖입니다. AI는 이미 조준을 멈추지만, 실내 거리에서
+		// 4도 원뿔은 살아 있는 적 옆에 무릎 꿇은 용의자를 맞힐 만큼 넓습니다. 그래서 여기서도
+		// 사격을 거부해야 합니다.
+		const ACQBCharacter* HitCharacter = Cast<ACQBCharacter>(HitActor);
+		const bool bHasSurrendered = HitCharacter && HitCharacter->IsSurrendered();
+
+		const bool bFriendly = bHasSurrendered
+			|| (!FCQBFactions::AreHostile(Owner, HitActor)
+				&& FCQBFactions::GetFaction(HitActor) != ECQBFaction::Neutral);
 
 		if (bFriendly)
 		{

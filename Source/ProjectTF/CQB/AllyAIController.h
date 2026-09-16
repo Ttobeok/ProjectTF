@@ -97,6 +97,17 @@ protected:
 	virtual void ExitState(ECQBAIState State) override;
 	virtual void UpdateGlobalTransitions(float DeltaTime) override;
 
+	/**
+	 *  A squad member whose target is dead has finished the fight, not the job: it picks the
+	 *  player's last order back up rather than standing down into Idle, which is an enemy state
+	 *  with no route back to an order.
+	 *
+	 *  대상이 죽은 분대원은 전투가 끝난 것이지 할 일이 끝난 게 아닙니다. 대기(Idle)로
+	 *  물러나는 대신 플레이어의 마지막 명령을 다시 집어듭니다. Idle은 적 쪽 상태라
+	 *  거기서 명령으로 돌아올 경로가 없습니다.
+	 */
+	virtual void OnTargetLost() override;
+
 	void EnterFollow();
 	void UpdateFollow(float DeltaTime);
 
