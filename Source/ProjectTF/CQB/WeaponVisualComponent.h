@@ -56,9 +56,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Visual")
 	FVector ViewOffset = FVector(42.0f, 13.0f, -16.0f);
 
-	/** The mesh is authored for a hand socket, so its muzzle needs turning to face forward */
+	/**
+	 *  The mesh is authored for a hand socket, so it has to be turned to lie along the view.
+	 *  -90 puts the muzzle downrange; +90 is the same axis the other way round, which points the
+	 *  stock at whatever you are aiming at.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Visual")
-	FRotator ViewRotation = FRotator(0.0f, 90.0f, 0.0f);
+	FRotator ViewRotation = FRotator(0.0f, -90.0f, 0.0f);
 
 	/** How far the weapon is shoved back on each shot, in cm */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Visual|Kick")
