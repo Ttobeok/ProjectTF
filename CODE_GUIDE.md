@@ -198,7 +198,7 @@ AI가 그 자리에서 판단합니다 — `AEnemyAIController::ReceiveChallenge
 | 부상 정도 | 최대 1.0 | 체력이 60% 아래로 떨어진 만큼 비례 |
 | 외침 거리 | 최대 0.5 | 1200 이내에서 가까울수록 |
 | 고립 | +0.4 | 같은 편이 전부 죽거나 항복했으면 |
-| 시야 없음 | -0.3 | 상대가 안 보이면 덜 위협적 |
+| 외치는 사람이 안 보임 | -0.3 | 안 보이는 상대는 덜 위협적 |
 | 조준당함 | +0.35 | 플레이어가 직접 겨누고 외칠 때 |
 
 합계가 `ComplianceThreshold`(1.0)를 넘으면 항복합니다.
@@ -208,9 +208,9 @@ AI가 그 자리에서 판단합니다 — `AEnemyAIController::ReceiveChallenge
 같은 자리에서 부상 정도만 바꿔 외친 결과입니다. 아래 명령으로 돌려볼 수 있습니다.
 
 ```
-만체력        →  0.61 / 1.00   "Not a chance!"       거부
-30% 체력      →  1.14 / 1.00   "Hands up!"           Cover -> Surrender
-15% 체력      →  1.42 / 1.00   "Hands up!"           Suppress -> Surrender
+만체력        →  0.74 / 1.00   "Not a chance!"       거부
+30% 체력      →  1.18 / 1.00   "Hands up!"           Cover -> Surrender
+15% 체력      →  1.48 / 1.00   "Hands up!"           Suppress -> Surrender
 ```
 
 소수점은 실행마다 조금씩 움직입니다 — 외치는 순간 용의자가 정확히 어디 서 있느냐에 따라
@@ -222,7 +222,7 @@ for D in 0.0 0.7 0.85; do
 done
 ```
 
-**동전 던지기가 아니라 상황을 읽습니다.** 0.61로 버티는 케이스가 이 시스템의 값어치입니다.
+**동전 던지기가 아니라 상황을 읽습니다.** 0.74로 버티는 케이스가 이 시스템의 값어치입니다.
 같은 부상이라도 멀리서 외치면 안 넘어갑니다 — 거리 항이 0.5까지 먹기 때문입니다.
 
 ### 항복 후
@@ -406,7 +406,7 @@ Enemy_3  Engage -> Cover -> Suppress   3번째 = Suppressor
 CQB debug: player placed at V(X=200.00, Y=80.00, Z=120.00)
 CQB debug: scripted order 'challenge' on Room A
 Enemy_1  Cover -> Surrender
-Enemy_1 surrendered (1.14 of 1.00)
+Enemy_1 surrendered (1.18 of 1.00)
 ```
 
 **아군 명령**

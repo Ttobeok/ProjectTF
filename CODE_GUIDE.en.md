@@ -221,7 +221,7 @@ spot, in `AEnemyAIController::ReceiveChallenge()`.
 | Wounded | up to 1.0 | In proportion to how far below 60 % health they are |
 | Shouting distance | up to 0.5 | Closer is more convincing, out to 1200 |
 | Isolated | +0.4 | Everyone on their side is dead or has given up |
-| No line of sight | −0.3 | Someone you cannot see is less frightening |
+| Cannot see the challenger | −0.3 | Someone you cannot see is less frightening |
 | Being aimed at | +0.35 | The player is pointing a weapon while shouting |
 
 Over `ComplianceThreshold` (1.0) they surrender.
@@ -231,9 +231,9 @@ Over `ComplianceThreshold` (1.0) they surrender.
 Same spot, varying only the wound. The command below runs it.
 
 ```
-full health   →  0.61 / 1.00   "Not a chance!"   refused
-30 % health   →  1.14 / 1.00   "Hands up!"       Cover -> Surrender
-15 % health   →  1.42 / 1.00   "Hands up!"       Suppress -> Surrender
+full health   →  0.74 / 1.00   "Not a chance!"   refused
+30 % health   →  1.18 / 1.00   "Hands up!"       Cover -> Surrender
+15 % health   →  1.48 / 1.00   "Hands up!"       Suppress -> Surrender
 ```
 
 The decimals move a little between runs, because the distance term depends on exactly where the
@@ -247,7 +247,7 @@ for D in 0.0 0.7 0.85; do
 done
 ```
 
-**It reads the situation rather than tossing a coin.** The case that holds at 0.61 is what the
+**It reads the situation rather than tossing a coin.** The case that holds at 0.74 is what the
 system is worth. The same wound shouted at from across the building does not land, because the
 distance term is worth up to half the threshold on its own.
 
@@ -447,7 +447,7 @@ Enemy_3  Engage -> Cover -> Suppress   third = Suppressor
 CQB debug: player placed at V(X=200.00, Y=80.00, Z=120.00)
 CQB debug: scripted order 'challenge' on Room A
 Enemy_1  Cover -> Surrender
-Enemy_1 surrendered (1.14 of 1.00)
+Enemy_1 surrendered (1.18 of 1.00)
 ```
 
 **Squad orders**
