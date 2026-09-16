@@ -246,9 +246,18 @@ void UWeaponComponent::Fire()
 		const ACQBCharacter* HitCharacter = Cast<ACQBCharacter>(HitActor);
 		const bool bHasSurrendered = HitCharacter && HitCharacter->IsSurrendered();
 
+		// The Neutral clause has to look at the shooter as well. Testing only the target inverted
+		// the rule for a Neutral shooter: it could not hurt anyone hostile, and the one thing it
+		// could hurt was another Neutral.
+		//
+		// Neutral 조건은 사수도 함께 봐야 합니다. 대상만 검사하면 Neutral 사수에서 규칙이
+		// 뒤집혀서, 적대 대상에게는 피해를 못 주고 유일하게 때릴 수 있는 것이 다른
+		// Neutral이 됩니다.
+		const bool bEitherNeutral = FCQBFactions::GetFaction(Owner) == ECQBFaction::Neutral
+			|| FCQBFactions::GetFaction(HitActor) == ECQBFaction::Neutral;
+
 		const bool bFriendly = bHasSurrendered
-			|| (!FCQBFactions::AreHostile(Owner, HitActor)
-				&& FCQBFactions::GetFaction(HitActor) != ECQBFaction::Neutral);
+			|| (!FCQBFactions::AreHostile(Owner, HitActor) && !bEitherNeutral);
 
 		if (bFriendly)
 		{
@@ -269,8 +278,19 @@ void UWeaponComponent::Fire()
 			// 체력 컴포넌트를 직접 건드리지 않고 엔진 데미지 파이프라인을 거칩니다. 그래야
 			// God 치트·데미지 타입·면역이 모두 살아 있습니다.
 			// UHealthComponent가 OnTakeAnyDamage를 구독해 결과를 반영합니다.
-			const float DamageDealt = UGameplayStatics::ApplyPointDamage(
+			// ApplyPointDamage returns what was requested, not what landed - the health component
+			// clamps at zero. Measure the difference so a hit on a suspect with 5 HP left reports
+			// 5 and not 20.
+			//
+			// ApplyPointDamage는 요청한 값을 돌려주지 실제로 들어간 값을 주지 않습니다. 체력
+			// 컴포넌트가 0에서 자릅니다. 차이를 재서, 5 남은 용의자를 맞혔을 때 20이 아니라
+			// 5로 보고되게 합니다.
+			const float HealthBefore = TargetHealth->CurrentHealth;
+
+			UGameplayStatics::ApplyPointDamage(
 				HitActor, Data->Damage, ShotDirection, Hit, InstigatorController, Owner, nullptr);
+
+			const float DamageDealt = HealthBefore - TargetHealth->CurrentHealth;
 
 			DebugMessage(SlotHit, FColor::Red, FString::Printf(TEXT("[%s] HIT %s  -%.0f  (%.0f HP left)"),
 				*Owner->GetName(), *HitActor->GetName(), DamageDealt, TargetHealth->CurrentHealth));

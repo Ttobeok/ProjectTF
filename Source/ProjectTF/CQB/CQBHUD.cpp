@@ -41,9 +41,12 @@ void ACQBHUD::OnWeaponHit(AActor* HitActor, float DamageDealt)
 
 void ACQBHUD::OnAmmoChanged(int32 CurrentAmmo, int32 MagSize)
 {
-	// only a shot reduces the count; a reload fills it back up
-	// 탄약을 줄이는 것은 발사뿐입니다. 재장전은 도로 채웁니다
-	FireKick = FireKickGap;
+	// only a shot reduces the count; a reload fills it back up and must not kick the crosshair
+	// 탄약을 줄이는 것은 발사뿐입니다. 재장전은 도로 채우며, 크로스헤어를 벌려선 안 됩니다
+	if (CurrentAmmo < MagSize)
+	{
+		FireKick = FireKickGap;
+	}
 }
 
 void ACQBHUD::DrawHUD()

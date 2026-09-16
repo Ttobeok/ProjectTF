@@ -18,6 +18,16 @@
 
 void AEnemyAIController::EnterIdle()
 {
+	// Standing down ends the engagement, so the one-flank-per-fight budget resets with it.
+	// Without this the flag is cleared only when a squad mate dies, which makes it one flank
+	// per level: an enemy that flanked once walks straight at the player ever after.
+	//
+	// 대기로 물러나면 그 교전은 끝난 것이므로, "교전당 우회 1회" 예산도 함께 초기화합니다.
+	// 이게 없으면 플래그는 분대원이 죽을 때만 풀려서 사실상 레벨당 1회가 됩니다. 한 번
+	// 우회한 적은 그 뒤로 계속 정면으로만 옵니다.
+	bFlankCompleted = false;
+	SquadRole = ESquadRole::None;
+
 	SetFiring(false);
 	StopMovement();
 	ClearFocus(EAIFocusPriority::Gameplay);

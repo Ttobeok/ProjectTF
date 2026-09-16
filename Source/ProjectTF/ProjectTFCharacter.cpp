@@ -378,6 +378,29 @@ void AProjectTFCharacter::OnPlayerDeath(AActor* DeadActor, AActor* Killer)
 //~ Squad commands --------------------------------------------------------------
 //~ Squad commands / 분대 명령 ----------------------------------------------------
 
+void AProjectTFCharacter::BuildOrderTraceParams(FCollisionQueryParams& OutParams) const
+{
+	OutParams.AddIgnoredActor(this);
+
+	// The squad blocks ECC_Visibility like anything else, and they stand exactly where the
+	// player is looking when he is giving them orders. Without this, stacking a door makes the
+	// ally beside it swallow the trace to that same door, so the follow-up Clear does nothing;
+	// a Watch order sends the squad to watch each other; and the shout prompt vanishes the
+	// moment someone crosses in front of the suspect.
+	//
+	// 분대원도 다른 것과 마찬가지로 ECC_Visibility를 막는데, 명령을 내리는 순간 하필 플레이어가
+	// 보는 그 자리에 서 있습니다. 이걸 빼면 문에 붙인 아군이 바로 그 문으로 가는 트레이스를
+	// 먹어버려서 이어지는 Clear가 먹통이 되고, Watch는 분대원끼리 서로를 감시하게 되며,
+	// 용의자 앞을 누가 지나가는 순간 외침 프롬프트가 사라집니다.
+	for (const AAllyAIController* Member : GetSquad())
+	{
+		if (const APawn* MemberPawn = Member->GetPawn())
+		{
+			OutParams.AddIgnoredActor(MemberPawn);
+		}
+	}
+}
+
 void AProjectTFCharacter::UpdateAimedDoorway()
 {
 	AimedDoorway = nullptr;
@@ -398,7 +421,7 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 	const FVector ViewLocation = FirstPersonCameraComponent->GetComponentLocation();
 	const FVector ViewDirection = GetBaseAimRotation().Vector();
 
-	float BestDot = FMath::Cos(FMath::DegreesToRadians(DoorwayAimAngle));
+	float BestDistance = DoorwayAimRange;
 
 	for (TActorIterator<ADoorwayMarker> It(World); It; ++It)
 	{
@@ -413,21 +436,34 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 		}
 
 		const float Dot = FVector::DotProduct(ToDoorway / Distance, ViewDirection);
-		if (Dot < BestDot)
+		if (Dot < FMath::Cos(FMath::DegreesToRadians(DoorwayAimAngle)))
+		{
+			continue;
+		}
+
+		// Nearest inside the cone wins, not the most centred. Scoring by angle alone let a
+		// doorway 11 m down the corridor beat the one the player is standing in, because a
+		// distant opening subtends a smaller angle no matter how squarely you face the near one.
+		//
+		// 원뿔 안에서 가장 가까운 것이 이깁니다. 각도만으로 점수를 매기면 11m 밖 문이 지금
+		// 발을 딛고 선 문을 이깁니다. 먼 개구부는 가까운 문을 아무리 정면으로 봐도 더 작은
+		// 각도를 차지하기 때문입니다.
+		if (Distance > BestDistance)
 		{
 			continue;
 		}
 
 		// no ordering a doorway through a wall
 		// 벽 너머의 문에는 명령할 수 없습니다
-		FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBDoorwayAim), false, this);
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBDoorwayAim), false);
+		BuildOrderTraceParams(Params);
 		FHitResult Blocker;
 		if (World->LineTraceSingleByChannel(Blocker, ViewLocation, Doorway->GetActorLocation() + FVector(0.0f, 0.0f, 100.0f), ECC_Visibility, Params))
 		{
 			continue;
 		}
 
-		BestDot = Dot;
+		BestDistance = Distance;
 		AimedDoorway = Doorway;
 	}
 
@@ -499,7 +535,8 @@ bool AProjectTFCharacter::GetAimedPoint(FVector& OutPoint) const
 	const FVector Start = FirstPersonCameraComponent->GetComponentLocation();
 	const FVector End = Start + GetBaseAimRotation().Vector() * 6000.0f;
 
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBOrderPoint), false, this);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBOrderPoint), false);
+	BuildOrderTraceParams(Params);
 
 	FHitResult Hit;
 	if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
@@ -524,7 +561,8 @@ void AProjectTFCharacter::UpdateChallengeTarget()
 	const FVector Start = FirstPersonCameraComponent->GetComponentLocation();
 	const FVector End = Start + GetBaseAimRotation().Vector() * ChallengeRange;
 
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBChallenge), false, this);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CQBChallenge), false);
+	BuildOrderTraceParams(Params);
 
 	FHitResult Hit;
 	if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))

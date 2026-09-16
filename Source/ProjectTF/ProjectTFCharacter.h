@@ -353,6 +353,12 @@ protected:
 	void CycleElementDown();
 
 	/**
+	 *  Trace params for the order and challenge traces: ignores the player and the squad.
+	 *  명령·외침 트레이스용 파라미터. 플레이어와 분대원을 무시합니다.
+	 */
+	void BuildOrderTraceParams(struct FCollisionQueryParams& OutParams) const;
+
+	/**
 	 *  Traces from the camera for a doorway the player might be ordering against
 	 *  플레이어가 명령을 내릴 만한 문을 카메라에서 찾습니다
 	 */
