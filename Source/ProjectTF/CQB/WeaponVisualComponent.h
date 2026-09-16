@@ -41,6 +41,24 @@ public:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	/**
+	 *  Where a shot should appear to come from, given the direction it was fired.
+	 *
+	 *  Uses the mesh's muzzle socket when it has one. Otherwise it runs along the aim from the
+	 *  weapon's own position, which is all a tracer needs: the point is that it starts somewhere
+	 *  other than the eye.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Weapon Visual")
+	FVector GetMuzzleLocation(const FVector& AimDirection) const;
+
+	/** Socket on the weapon mesh to fire from, when it has one */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Visual")
+	FName MuzzleSocket = FName("Muzzle");
+
+	/** Distance along the aim used when the mesh has no muzzle socket, in cm */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Visual")
+	float MuzzleForwardOffset = 55.0f;
+
 	/** Weapon mesh. Loaded on BeginPlay, never from a constructor. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Visual")
 	TSoftObjectPtr<USkeletalMesh> WeaponMeshAsset;

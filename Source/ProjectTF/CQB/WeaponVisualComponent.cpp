@@ -44,6 +44,16 @@ void UWeaponVisualComponent::BeginPlay()
 	}
 }
 
+FVector UWeaponVisualComponent::GetMuzzleLocation(const FVector& AimDirection) const
+{
+	if (DoesSocketExist(MuzzleSocket))
+	{
+		return GetSocketLocation(MuzzleSocket);
+	}
+
+	return GetComponentLocation() + AimDirection.GetSafeNormal() * MuzzleForwardOffset;
+}
+
 void UWeaponVisualComponent::AttachToOwner()
 {
 	AActor* Owner = GetOwner();

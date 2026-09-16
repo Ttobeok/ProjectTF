@@ -1,6 +1,7 @@
 // CQB Sample - hitscan weapon component shared by player and enemies.
 
 #include "WeaponComponent.h"
+#include "WeaponVisualComponent.h"
 #include "WeaponData.h"
 #include "HealthComponent.h"
 #include "CQBTypes.h"
@@ -202,7 +203,15 @@ void UWeaponComponent::Fire()
 
 	if (bDrawDebugTrace)
 	{
-		DrawDebugLine(World, ViewLocation, ImpactPoint, FColor::Yellow, false, 0.6f, 0, 0.6f);
+		// from the muzzle, not the eye: a line from the camera to what the camera is looking at
+		// is seen end on, and a thick one fills the middle of the screen with a coloured slab
+		FVector TracerStart = ViewLocation;
+		if (const UWeaponVisualComponent* Visual = Owner->FindComponentByClass<UWeaponVisualComponent>())
+		{
+			TracerStart = Visual->GetMuzzleLocation(ShotDirection);
+		}
+
+		DrawDebugLine(World, TracerStart, ImpactPoint, FColor::Yellow, false, 0.6f, 0, 0.6f);
 	}
 
 	// damage anything carrying a health component
