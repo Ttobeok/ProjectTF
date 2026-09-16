@@ -33,3 +33,8 @@ Dist/
 # Content that should stay (do not ignore .uasset / .umap)
 !*.uasset
 !*.umap
+
+# Editor and search tool config that carries machine specific paths
+# (ProjectTF.code-workspace points at this machine's UE_5.8 install)
+.ignore
+*.code-workspace
