@@ -1,4 +1,5 @@
 // CQB Sample - faction lookups.
+// CQB 샘플 - 진영 판별.
 
 #include "CQBTypes.h"
 #include "GameFramework/Actor.h"
@@ -20,6 +21,7 @@ ECQBFaction FCQBFactions::GetFaction(const AActor* Actor)
 	}
 
 	// a controller can answer for its pawn and the other way round
+	// 컨트롤러가 자기 폰을 대신해 답할 수 있고, 그 반대도 마찬가지입니다
 	if (APawn* AsPawn = Cast<APawn>(Mutable))
 	{
 		if (const ICQBFactionAgent* ControllerAgent = Cast<ICQBFactionAgent>(AsPawn->GetController()))
@@ -39,6 +41,7 @@ bool FCQBFactions::AreHostile(ECQBFaction A, ECQBFaction B)
 	}
 
 	// the player and their squad are one side, everyone else is the other
+	// 플레이어와 그 분대가 한 편, 나머지가 반대편입니다
 	const bool bAFriendly = (A == ECQBFaction::Player || A == ECQBFaction::Ally);
 	const bool bBFriendly = (B == ECQBFaction::Player || B == ECQBFaction::Ally);
 

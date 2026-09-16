@@ -1,4 +1,5 @@
 // CQB Sample - shared health component for player and enemies.
+// CQB 샘플 - 플레이어와 적이 함께 쓰는 체력 컴포넌트.
 
 #include "HealthComponent.h"
 #include "GameFramework/Actor.h"
@@ -16,6 +17,7 @@ void UHealthComponent::BeginPlay()
 	bIsDead = false;
 
 	// route engine damage (explosions, kill volumes, ApplyDamage) through this component too
+	// 엔진 쪽 피해(폭발, 킬 볼륨, ApplyDamage)도 이 컴포넌트를 거치도록 연결합니다
 	if (AActor* Owner = GetOwner())
 	{
 		Owner->OnTakeAnyDamage.AddDynamic(this, &UHealthComponent::HandleAnyDamage);
