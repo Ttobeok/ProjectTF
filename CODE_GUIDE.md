@@ -16,13 +16,13 @@
 | 1 | `CQBTypes.h` | 168 | 진영·상태·역할·콜아웃 enum + 진영 판별. 나머지 전부가 참조 |
 | 2 | `HealthComponent.h/.cpp` | 147 | 가장 단순. 컴포넌트 패턴 감 잡기 |
 | 3 | `WeaponData.h` | 101 | 무기 수치 전부. 주석에 단위까지 |
-| 4 | `WeaponComponent.cpp` | 426 | 사격 파이프라인. `Fire()` 하나면 절반 |
-| 5 | `EnemyAIController.h` | 340 | 상태머신 구조. 헤더만 봐도 설계가 보임 |
+| 4 | `WeaponComponent.cpp` | 435 | 사격 파이프라인. `Fire()` 하나면 절반 |
+| 5 | `EnemyAIController.h` | 347 | 상태머신 구조. 헤더만 봐도 설계가 보임 |
 | 6 | `EnemyAIController.cpp` | 399 | 상태머신 본체 — 감각이 들어가고 상태가 나옴 |
 | 7 | `EnemyAIController_States.cpp` | 266 | 상태 7개의 Enter/Update/Exit |
 | 8 | `EnemyAIController_Actions.cpp` | 237 | 상태가 시키는 일 — 사격·조준·이동·엄폐 탐색 |
 | 9 | `EnemyAIController_Squad.cpp` | 173 | 콜아웃 수신, 역할 재배정, 항복 판정 |
-| 10 | `AllyAIController.cpp` | 388 | 6~9번을 상속해 명령 5개를 얹은 것 |
+| 10 | `AllyAIController.cpp` | 395 | 6~9번을 상속해 명령 5개를 얹은 것 |
 | 11 | `SquadManager.cpp` | 222 | 적 분대의 역할 배분·콜아웃 |
 
 `AEnemyAIController`는 파일 4개로 나뉘어 있습니다. 클래스는 하나고, 경계는 역할별입니다:
@@ -206,14 +206,16 @@ AI가 그 자리에서 판단합니다 — `AEnemyAIController::ReceiveChallenge
 
 ### 실측 (헤드리스 3회)
 
-같은 자리(방 B 문 앞 230 거리)에서 부상 정도만 바꿔 외친 결과입니다.
-아래 명령 그대로 재현됩니다.
+같은 자리에서 부상 정도만 바꿔 외친 결과입니다. 아래 명령으로 돌려볼 수 있습니다.
 
 ```
-만체력        →  0.68 / 1.00   "Not a chance!"       거부
-30% 체력      →  1.15 / 1.00   "Hands up!"           Cover -> Surrender
-15% 체력      →  1.37 / 1.00   "Hands up!"           Suppress -> Surrender
+만체력        →  0.61 / 1.00   "Not a chance!"       거부
+30% 체력      →  1.14 / 1.00   "Hands up!"           Cover -> Surrender
+15% 체력      →  1.42 / 1.00   "Hands up!"           Suppress -> Surrender
 ```
+
+소수점은 실행마다 조금씩 움직입니다 — 외치는 순간 용의자가 정확히 어디 서 있느냐에 따라
+거리 항이 달라지기 때문입니다. 결론(거부/항복)은 바뀌지 않습니다.
 
 ```bash
 for D in 0.0 0.7 0.85; do
@@ -221,7 +223,7 @@ for D in 0.0 0.7 0.85; do
 done
 ```
 
-**동전 던지기가 아니라 상황을 읽습니다.** 0.68로 버티는 케이스가 이 시스템의 값어치입니다.
+**동전 던지기가 아니라 상황을 읽습니다.** 0.61로 버티는 케이스가 이 시스템의 값어치입니다.
 같은 부상이라도 멀리서 외치면 안 넘어갑니다 — 거리 항이 0.5까지 먹기 때문입니다.
 
 ### 항복 후
@@ -405,7 +407,7 @@ Enemy_3  Engage -> Cover -> Suppress   3번째 = Suppressor
 CQB debug: player placed at V(X=200.00, Y=80.00, Z=120.00)
 CQB debug: scripted order 'challenge' on Room A
 Enemy_1  Cover -> Surrender
-Enemy_1 surrendered (1.15 of 1.00)
+Enemy_1 surrendered (1.14 of 1.00)
 ```
 
 **아군 명령**
@@ -486,7 +488,8 @@ Blueprint Class → AEnemyCharacter     → BP_Enemy
 
 ## 14. 아직 안 열어둔 것
 
-- **BP 확장 훅 없음** (`BlueprintImplementableEvent` 0개) — 사운드·머즐 플래시를 BP에서 붙일 자리가 없습니다.
+- **BP 확장 훅 없음** (`CQB/` 아래에 `BlueprintImplementableEvent` 0개. grep하면 나오는 건
+  손대지 않은 템플릿 variant 쪽입니다) — 사운드·머즐 플래시를 BP에서 붙일 자리가 없습니다.
   붙인다면 `OnStateChanged` / `OnCalloutSpoken` / `OnWeaponFired` / `OnEnemyDied`.
 - **적 프로파일 DataAsset 없음** — AI 수치 12개가 컨트롤러에 흩어져 있어 성격을 바꾸려면 BP 복제가 필요합니다.
 - **적 프로파일을 BP 없이 못 바꿈** — 위 표대로 BP 껍데기를 한 번 만들어야 인스펙터가 열립니다.

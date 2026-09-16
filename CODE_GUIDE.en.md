@@ -18,13 +18,13 @@ differs.**
 | 1 | `CQBTypes.h` | 205 | Faction, state, role and callout enums, plus the faction lookup. Everything else refers to it |
 | 2 | `HealthComponent.h/.cpp` | 147 | The simplest one. Gets you used to the component pattern |
 | 3 | `WeaponData.h` | 101 | Every weapon number, with units in the comments |
-| 4 | `WeaponComponent.cpp` | 426 | The firing pipeline. `Fire()` alone is half of it |
-| 5 | `EnemyAIController.h` | 340 | The machine's shape. The header alone shows the design |
+| 4 | `WeaponComponent.cpp` | 435 | The firing pipeline. `Fire()` alone is half of it |
+| 5 | `EnemyAIController.h` | 347 | The machine's shape. The header alone shows the design |
 | 6 | `EnemyAIController.cpp` | 399 | The machine itself — senses in, state out |
 | 7 | `EnemyAIController_States.cpp` | 266 | Seven states, one Enter/Update/Exit trio each |
 | 8 | `EnemyAIController_Actions.cpp` | 237 | The verbs states call — fire, face, move, find cover |
 | 9 | `EnemyAIController_Squad.cpp` | 173 | Callouts, role reassignment, the surrender arithmetic |
-| 10 | `AllyAIController.cpp` | 388 | Inherits 6–9 and adds five orders |
+| 10 | `AllyAIController.cpp` | 395 | Inherits 6–9 and adds five orders |
 | 11 | `SquadManager.cpp` | 222 | Role handout and callout relay for the enemy side |
 
 `AEnemyAIController` is one class across four files, split by role rather than by line count. If
@@ -229,14 +229,16 @@ Over `ComplianceThreshold` (1.0) they surrender.
 
 ### Measured, three headless runs
 
-Same spot — 230 from the doorway of room B — varying only the wound. The command below reproduces
-it.
+Same spot, varying only the wound. The command below runs it.
 
 ```
-full health   →  0.68 / 1.00   "Not a chance!"   refused
-30 % health   →  1.15 / 1.00   "Hands up!"       Cover -> Surrender
-15 % health   →  1.37 / 1.00   "Hands up!"       Suppress -> Surrender
+full health   →  0.61 / 1.00   "Not a chance!"   refused
+30 % health   →  1.14 / 1.00   "Hands up!"       Cover -> Surrender
+15 % health   →  1.42 / 1.00   "Hands up!"       Suppress -> Surrender
 ```
+
+The decimals move a little between runs, because the distance term depends on exactly where the
+suspect happens to be standing when the shout lands. The outcomes do not.
 
 ```bash
 for D in 0.0 0.7 0.85; do
@@ -246,7 +248,7 @@ for D in 0.0 0.7 0.85; do
 done
 ```
 
-**It reads the situation rather than tossing a coin.** The case that holds at 0.68 is what the
+**It reads the situation rather than tossing a coin.** The case that holds at 0.61 is what the
 system is worth. The same wound shouted at from across the building does not land, because the
 distance term is worth up to half the threshold on its own.
 
@@ -446,7 +448,7 @@ Enemy_3  Engage -> Cover -> Suppress   third = Suppressor
 CQB debug: player placed at V(X=200.00, Y=80.00, Z=120.00)
 CQB debug: scripted order 'challenge' on Room A
 Enemy_1  Cover -> Surrender
-Enemy_1 surrendered (1.15 of 1.00)
+Enemy_1 surrendered (1.14 of 1.00)
 ```
 
 **Squad orders**
@@ -532,7 +534,8 @@ Same for the allies (`AAllyAIController` / `AAllyCharacter`).
 
 ## 14. What is deliberately not open yet
 
-- **No Blueprint extension hooks** (zero `BlueprintImplementableEvent`) — there is nowhere to hang
+- **No Blueprint extension hooks** (no `BlueprintImplementableEvent` anywhere under `CQB/`; the
+  hits you will find are in the untouched template variants) — there is nowhere to hang
   sound or a muzzle flash from a Blueprint. The places to add them would be `OnStateChanged`,
   `OnCalloutSpoken`, `OnWeaponFired`, `OnEnemyDied`.
 - **No enemy profile data asset** — a dozen AI numbers sit on the controller, so changing an

@@ -138,7 +138,7 @@ Source/ProjectTF/
     │                             발사 시 UAISense_Hearing 노이즈 이벤트
     ├── ACQBHUD                   (AHUD) 캔버스 크로스헤어 + HP/탄약 + 디버그 명령
     ├── ACQBCharacter             (ACharacter) AI 폰의 공통 몸. 플레이어와 같은 Health/Weapon
-    │                             컴포넌트 재사용, 사망 시 래그돌 → 6초 후 Destroy
+    │                             컴포넌트 재사용, 사망 시 래그돌. 시체는 그대로 남습니다
     │                             진영은 Neutral — 어느 편인지는 하위 클래스가 정함
     │   ├── AEnemyCharacter       Faction = Enemy,  AIController = AEnemyAIController
     │   └── AAllyCharacter        Faction = Ally,   AIController = AAllyAIController
