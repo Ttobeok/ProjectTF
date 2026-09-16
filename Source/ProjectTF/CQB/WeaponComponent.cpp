@@ -446,6 +446,9 @@ void UWeaponComponent::ApplyRecoil()
 
 	AccumulatedRecoil.X += FRotator::NormalizeAxis(Applied.Pitch - Before.Pitch);
 	AccumulatedRecoil.Y += FRotator::NormalizeAxis(Applied.Yaw - Before.Yaw);
+
+	LastAppliedRotation = Applied;
+	bHasAppliedRotation = true;
 }
 
 void UWeaponComponent::RecoverRecoil(float DeltaTime)
@@ -470,6 +473,47 @@ void UWeaponComponent::RecoverRecoil(float DeltaTime)
 		return;
 	}
 
+	// Take off whatever the player has already pulled out by hand before recovering any of it.
+	//
+	// Recovery used to subtract the running total blind, with no reference to where the view
+	// actually is. A player who holds the target by dragging the mouse down through a burst has
+	// already cancelled that rotation; subtracting it again a second time drags the crosshair
+	// the same distance below the point they were aiming at, every burst.
+	//
+	// 회복하기 전에, 플레이어가 이미 손으로 빼낸 만큼을 먼저 장부에서 덜어냅니다.
+	//
+	// 기존 회복은 화면이 실제로 어디를 보고 있는지와 무관하게 누적치를 그냥 뺐습니다.
+	// 연사 중에 마우스를 내려 표적을 붙잡는 플레이어는 이미 그 회전을 상쇄한 상태인데,
+	// 그걸 한 번 더 빼면 매 연사마다 조준점이 원래 겨누던 곳보다 그만큼 아래로 끌려갑니다.
+	if (bHasAppliedRotation)
+	{
+		const FRotator Now = OwnerController->GetControlRotation();
+
+		const float PlayerPitch = FRotator::NormalizeAxis(Now.Pitch - LastAppliedRotation.Pitch);
+		const float PlayerYaw = FRotator::NormalizeAxis(Now.Yaw - LastAppliedRotation.Yaw);
+
+		// only movement that opposes the accumulated recoil counts as compensation
+		// 누적된 반동을 거스르는 방향의 움직임만 보정으로 칩니다
+		if (PlayerPitch * AccumulatedRecoil.X < 0.0f)
+		{
+			AccumulatedRecoil.X += FMath::Sign(AccumulatedRecoil.X)
+				* -FMath::Min(FMath::Abs(PlayerPitch), FMath::Abs(AccumulatedRecoil.X));
+		}
+
+		if (PlayerYaw * AccumulatedRecoil.Y < 0.0f)
+		{
+			AccumulatedRecoil.Y += FMath::Sign(AccumulatedRecoil.Y)
+				* -FMath::Min(FMath::Abs(PlayerYaw), FMath::Abs(AccumulatedRecoil.Y));
+		}
+
+		if (AccumulatedRecoil.IsNearlyZero())
+		{
+			AccumulatedRecoil = FVector2D::ZeroVector;
+			LastAppliedRotation = Now;
+			return;
+		}
+	}
+
 	// walk each axis back towards zero and subtract the same amount from the view
 	// 각 축을 0쪽으로 되돌리면서 같은 양만큼 시점에서 뺍니다
 	const FVector2D Recovered(
@@ -484,6 +528,9 @@ void UWeaponComponent::RecoverRecoil(float DeltaTime)
 	OwnerController->SetControlRotation(ControlRotation);
 
 	AccumulatedRecoil = Recovered;
+
+	LastAppliedRotation = OwnerController->GetControlRotation();
+	bHasAppliedRotation = true;
 }
 
 void UWeaponComponent::UpdateADS(float DeltaTime)

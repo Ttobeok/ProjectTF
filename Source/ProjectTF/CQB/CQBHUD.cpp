@@ -159,7 +159,14 @@ void ACQBHUD::DrawSquadBar()
 
 	// squad roster down the right hand side, the way a team readout usually reads
 	// 분대 명부를 세로로 나열합니다. 팀 표시가 보통 읽히는 방식대로
-	const TArray<AAllyAIController*> Squad = Player->GetSquad();
+	// Built from pawns, not controllers: a controller unpossesses and destroys itself the moment
+	// its pawn dies, so a roster built from controllers silently dropped a squad member from the
+	// list the instant they went down instead of showing them as DOWN.
+	//
+	// 컨트롤러가 아니라 폰으로 만듭니다. 컨트롤러는 자기 폰이 죽는 순간 빙의를 풀고 스스로를
+	// 파괴하므로, 컨트롤러로 만든 명부는 분대원이 쓰러지자마자 DOWN으로 보여주는 대신 목록에서
+	// 조용히 지워버렸습니다.
+	const TArray<ACQBCharacter*> Squad = Player->GetSquadPawns();
 	const ESquadElement Selected = Player->GetSelectedElement();
 
 	// Left hand side: the weapon view model owns the bottom right corner of the screen.
@@ -167,10 +174,13 @@ void ACQBHUD::DrawSquadBar()
 	const float RosterX = 40.0f;
 	float RowY = Canvas->SizeY - 250.0f;
 
-	for (const AAllyAIController* Member : Squad)
+	for (const ACQBCharacter* MemberPawn : Squad)
 	{
-		const APawn* MemberPawn = Member->GetPawn();
-		const UHealthComponent* Health = MemberPawn ? MemberPawn->FindComponentByClass<UHealthComponent>() : nullptr;
+		const UHealthComponent* Health = MemberPawn->GetHealthComponent();
+
+		// null once the pawn is down, which is exactly the case this roster has to survive
+		// 폰이 쓰러지면 null입니다. 이 명부가 버텨야 하는 경우가 바로 그것입니다
+		const AAllyAIController* Member = Cast<AAllyAIController>(MemberPawn->GetController());
 
 		FString Status(TEXT("--"));
 		FLinearColor StatusColour = FLinearColor::Gray;
@@ -198,17 +208,18 @@ void ACQBHUD::DrawSquadBar()
 
 		// dim the members this order would not reach
 		// 이 명령이 닿지 않는 인원은 흐리게 표시합니다
-		const bool bInSelection = (Selected == ESquadElement::All || Member->GetElement() == Selected);
+		const bool bInSelection = (Selected == ESquadElement::All || MemberPawn->Element == Selected);
 		const float Dim = bInSelection ? 1.0f : 0.4f;
 
-		const FLinearColor ElementColour = (Member->GetElement() == ESquadElement::Red)
+		const FLinearColor ElementColour = (MemberPawn->Element == ESquadElement::Red)
 			? FLinearColor(1.0f, 0.45f, 0.45f) : FLinearColor(0.45f, 0.65f, 1.0f);
 
 		// three columns, drawn separately so the condition can carry its own colour
 		// 세 개의 열로 따로 그립니다. 그래야 상태가 자기 색을 가질 수 있습니다
-		DrawText(Member->GetDisplayName(), ElementColour * Dim, RosterX, RowY, Font, 0.95f);
+		DrawText(MemberPawn->CallSign, ElementColour * Dim, RosterX, RowY, Font, 0.95f);
 		DrawText(Status, StatusColour * Dim, RosterX + 80.0f, RowY, Font, 0.95f);
-		DrawText(Member->GetOrderName(), FLinearColor(0.8f, 0.8f, 0.85f) * Dim, RosterX + 145.0f, RowY, Font, 0.95f);
+		DrawText(Member ? Member->GetOrderName() : FString(TEXT("--")),
+			FLinearColor(0.8f, 0.8f, 0.85f) * Dim, RosterX + 145.0f, RowY, Font, 0.95f);
 
 		RowY += 22.0f;
 	}

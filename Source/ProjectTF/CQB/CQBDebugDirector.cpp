@@ -70,6 +70,12 @@ void ACQBDebugDirector::ArmFromCommandLine()
 		FParse::Value(CommandLine, TEXT("CQBKillCount="), DamageCount);
 		FParse::Value(CommandLine, TEXT("CQBKillDamage="), DamageFraction);
 
+		FString Side;
+		if (FParse::Value(CommandLine, TEXT("CQBKillSide="), Side) && Side.Equals(TEXT("ally"), ESearchCase::IgnoreCase))
+		{
+			DamageSide = ECQBFaction::Ally;
+		}
+
 		UE_LOG(LogProjectTF, Warning, TEXT("CQB debug: hitting %d suspect(s) for %.0f%% in %.1fs"),
 			DamageCount, DamageFraction * 100.0f, DamageAfter);
 
@@ -101,7 +107,7 @@ TArray<ACQBCharacter*> ACQBDebugDirector::GatherSuspects() const
 	{
 		ACQBCharacter* Character = *It;
 		if (Character && !Character->IsDead() && !Character->IsSurrendered()
-			&& Character->GetFaction() == ECQBFaction::Enemy)
+			&& Character->GetFaction() == DamageSide)
 		{
 			Suspects.Add(Character);
 		}

@@ -97,6 +97,29 @@ public:
 	UPROPERTY(EditAnywhere, Category = "CQB")
 	FName BodyTintParameter = FName("Paint Tint");
 
+	/**
+	 *  Callsign, copied down from the controller when it possesses this pawn.
+	 *
+	 *  The pawn keeps it because the controller does not outlive the pawn: it unpossesses and
+	 *  destroys itself the moment its pawn dies, and a roster built from controllers therefore
+	 *  cannot show anyone as down - they simply vanish from the list.
+	 *
+	 *  호출부호. 컨트롤러가 이 폰에 빙의할 때 내려 받습니다.
+	 *
+	 *  폰이 들고 있는 이유는 컨트롤러가 폰보다 오래 살지 않기 때문입니다. 폰이 죽는 순간
+	 *  빙의를 풀고 스스로를 파괴하므로, 컨트롤러로 명부를 만들면 전사자를 표시할 수가
+	 *  없습니다 — 목록에서 그냥 사라집니다.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CQB")
+	FString CallSign;
+
+	/**
+	 *  Which half of the squad this pawn belongs to, kept for the same reason as CallSign
+	 *  이 폰이 속한 분대의 절반. CallSign과 같은 이유로 들고 있습니다
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "CQB")
+	ESquadElement Element = ESquadElement::Red;
+
 	//~Begin ICQBFactionAgent
 	virtual ECQBFaction GetFaction() const override { return Faction; }
 	//~End ICQBFactionAgent

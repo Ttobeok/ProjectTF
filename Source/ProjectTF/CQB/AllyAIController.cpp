@@ -48,6 +48,11 @@ void AAllyAIController::OnPossess(APawn* InPawn)
 	if (ACQBCharacter* Body = Cast<ACQBCharacter>(InPawn))
 	{
 		Body->SetBodyTint(Element == ESquadElement::Red ? RedTint : BlueTint);
+
+		// hand the identity down to the pawn, which outlives this controller
+		// 신원을 폰에 내려줍니다. 폰이 이 컨트롤러보다 오래 삽니다
+		Body->CallSign = GetDisplayName();
+		Body->Element = Element;
 	}
 
 	// squad members start at the player's shoulder

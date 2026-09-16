@@ -489,6 +489,27 @@ void AProjectTFCharacter::UpdateAimedDoorway()
 	}
 }
 
+TArray<ACQBCharacter*> AProjectTFCharacter::GetSquadPawns() const
+{
+	TArray<ACQBCharacter*> Pawns;
+
+	for (TActorIterator<ACQBCharacter> It(GetWorld()); It; ++It)
+	{
+		ACQBCharacter* Body = *It;
+		if (IsValid(Body) && Body->GetFaction() == ECQBFaction::Ally)
+		{
+			Pawns.Add(Body);
+		}
+	}
+
+	Pawns.Sort([](const ACQBCharacter& A, const ACQBCharacter& B)
+	{
+		return A.CallSign < B.CallSign;
+	});
+
+	return Pawns;
+}
+
 TArray<AAllyAIController*> AProjectTFCharacter::GetSquad() const
 {
 	// The HUD asks for this every rendered frame. Walking every actor in the world that often

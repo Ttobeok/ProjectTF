@@ -228,6 +228,21 @@ protected:
 	bool bIsADS = false;
 
 	/**
+	 *  Control rotation as this component last left it, so the player's own aiming can be told
+	 *  apart from the recoil this component applied.
+	 *
+	 *  이 컴포넌트가 마지막으로 남겨둔 컨트롤러 회전. 플레이어 본인의 조준과 이 컴포넌트가
+	 *  넣은 반동을 구분하기 위한 것입니다.
+	 */
+	FRotator LastAppliedRotation = FRotator::ZeroRotator;
+
+	/**
+	 *  True once LastAppliedRotation holds something worth comparing against
+	 *  LastAppliedRotation에 비교할 값이 들어 있으면 true
+	 */
+	bool bHasAppliedRotation = false;
+
+	/**
 	 *  Recoil pushed into the controller so far and not yet recovered, in degrees
 	 *  컨트롤러에 더해졌고 아직 회복되지 않은 반동 누적치(도)
 	 */

@@ -205,6 +205,20 @@ public:
 	TArray<AAllyAIController*> GetSquad() const;
 
 	/**
+	 *  Every squad pawn, the fallen included, for the HUD roster.
+	 *
+	 *  Built from pawns rather than controllers on purpose: a controller destroys itself when
+	 *  its pawn dies, so a roster built from controllers cannot show anyone as down.
+	 *
+	 *  전사자를 포함한 모든 분대 폰. HUD 명부용입니다.
+	 *
+	 *  일부러 컨트롤러가 아니라 폰에서 만듭니다. 컨트롤러는 자기 폰이 죽으면 스스로를
+	 *  파괴하므로, 컨트롤러로 만든 명부는 전사자를 표시할 수가 없습니다.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Squad")
+	TArray<ACQBCharacter*> GetSquadPawns() const;
+
+	/**
 	 *  Squad members the current element selection would take an order
 	 *  현재 선택된 element 기준으로 명령을 받을 분대원들
 	 */

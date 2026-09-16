@@ -21,6 +21,7 @@ class ADoorwayMarker;
  *    -CQBKillEnemyAfter=<s>   hit suspects after a delay
  *    -CQBKillCount=<n>        how many of them, default 1
  *    -CQBKillDamage=<f>       fraction of max health, default lethal
+ *    -CQBKillSide=<side>      enemy (default) or ally, for testing the down state on the HUD
  *    -CQBOrderAfter=<s>       issue a squad order after a delay
  *    -CQBOrder=<name>         follow | hold | stack | clear | watch | challenge
  *    -CQBOrderDoor=<n>        which doorway, ordered west to east
@@ -37,6 +38,7 @@ class ADoorwayMarker;
  *    -CQBKillEnemyAfter=<초>  N초 뒤 용의자 타격
  *    -CQBKillCount=<수>       몇 명. 기본 1
  *    -CQBKillDamage=<비율>    최대 체력 대비. 기본은 즉사
+ *    -CQBKillSide=<진영>      enemy(기본) 또는 ally. HUD의 전사 표시 검증용
  *    -CQBOrderAfter=<초>      N초 뒤 분대 명령
  *    -CQBOrder=<이름>         follow | hold | stack | clear | watch | challenge
  *    -CQBOrderDoor=<n>        어느 문인지. 서에서 동 순서
@@ -100,5 +102,11 @@ protected:
 	float DamageFraction = 10.0f;
 
 	FString OrderName;
+
+	/**
+	 *  Which side the damage hook hits. Enemy unless the command line says otherwise.
+	 *  타격 훅이 어느 편을 때릴지. 커맨드라인이 달리 말하지 않으면 적입니다.
+	 */
+	ECQBFaction DamageSide = ECQBFaction::Enemy;
 	int32 OrderDoorIndex = 0;
 };
