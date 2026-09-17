@@ -177,7 +177,7 @@ five orders.
 | `Follow` | Z | Holds 300 behind the player. Re-paths only once the player has moved 150 |
 | `Hold` | H | Stops where it stands, still fights what it sees |
 | `Stack` | aim at a door + 1 | Moves to its assigned left/right stack point, says "In position" on arrival |
-| `Clear` | aim at a door + 2 | Goes through and sweeps; three quiet seconds → "Room clear!" → Follow |
+| `Clear` | aim at a door + 2 | Goes through one at a time, each to its own slot, shooting on the move; three quiet seconds in the room → "Room clear!" → Follow |
 | `Watch` | aim at a point + 3 | Stays put and keeps eyes on that point |
 
 **The squad is four, split Red two and Blue two.** The mouse wheel cycles which element the next
@@ -359,6 +359,13 @@ camera.
 **The level script overwrites the map wholesale.** Once you start hand-editing it, do not run it
 again.
 
+**The navmesh erodes every obstacle by the agent radius, so cover near a doorway can seal it.** Cover_B1
+stood across room B's entry lane; eroded by 35 cm, its edge met the eroded edge of the door's wall
+stubs with no gap at all. The door stayed open to the player and shut to the AI, every route between
+the rooms went round the flank corridor, and nothing looked wrong because every log line was a state
+transition. `-CQBTraceSquad` exists because of this: a path of 3,040 for a trip that is 800 in a
+straight line is the tell.
+
 **An AI controller does not outlive its pawn.** It unpossesses and destroys itself the moment the
 pawn dies, so **a list built from controllers cannot show anyone as down** - they vanish from it on
 the next frame. That is why the HUD roster is built from pawns, and why the callsign and element are
@@ -403,6 +410,7 @@ nothing at all unless an argument asks for something.
 | `-CQBKillCount=<n>` | How many, nearest the player first. Default 1 |
 | `-CQBKillDamage=<f>` | Fraction of max health. Default 10.0, which is lethal; 0.7 wounds instead |
 | `-CQBKillSide=<side>` | `enemy` (default) or `ally`, for checking the down state on the HUD |
+| `-CQBTraceSquad=<s>` | Every `<s>` seconds, log each squad member's state, position and path (point count, length, goal) |
 | `-CQBOrderAfter=<s>` | Issue a squad order after a delay |
 | `-CQBOrder=<name>` | follow / hold / stack / clear / watch / challenge |
 | `-CQBOrderDoor=<n>` | 0 = room A door, 1 = room B door, ordered west to east |
