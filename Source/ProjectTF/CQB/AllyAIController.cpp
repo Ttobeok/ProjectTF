@@ -284,7 +284,20 @@ void AAllyAIController::UpdateFollow(float DeltaTime)
 
 	// only re-path once the player has actually moved somewhere else
 	// 플레이어가 실제로 다른 곳으로 움직였을 때만 경로를 다시 잡습니다
-	if (!bHasGoal || FVector::Dist2D(Goal, CurrentGoal) > FollowRepathDistance)
+	// Re-path when the player has moved, and also when this member stopped short of where it
+	// was going. A move that ends against a squad mate in a doorway finishes without arriving;
+	// with the player standing still the goal never changes, so nothing asked again and the
+	// member stood in the door for the rest of the level.
+	//
+	// 플레이어가 움직였을 때 재경로를 잡고, 이 분대원이 목적지에 못 미친 채 멈췄을 때도 잡습니다.
+	// 문간에서 동료에게 막혀 끝난 이동은 도착하지 않은 채 종료됩니다. 플레이어가 가만히 있으면
+	// 목표가 안 바뀌니 아무도 다시 요청하지 않았고, 그 분대원은 레벨이 끝날 때까지 문에 서
+	// 있었습니다.
+	const bool bLeaderMoved = !bHasGoal || FVector::Dist2D(Goal, CurrentGoal) > FollowRepathDistance;
+	const bool bStoppedShort = GetMoveStatus() == EPathFollowingStatus::Idle
+		&& FVector::Dist2D(MyPawn->GetActorLocation(), Goal) > FollowRepathDistance;
+
+	if (bLeaderMoved || bStoppedShort)
 	{
 		MoveToPoint(Goal);
 	}
