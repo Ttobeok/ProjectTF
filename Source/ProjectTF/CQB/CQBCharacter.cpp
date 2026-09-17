@@ -78,6 +78,15 @@ ACQBCharacter::ACQBCharacter()
 	// 용의자가 8m 방을 2초에 가로질러 플레이어가 상황을 읽기도 전에 교전이 끝났습니다.
 	GetCharacterMovement()->MaxWalkSpeed = 230.0f;
 
+	// Steer round other pawns. The navmesh knows nothing about characters, so a path through a
+	// 2 m doorway is planned as if the squad mate standing in it were not there, and without
+	// avoidance the member walks into them and pushes until path following gives up as blocked.
+	// 다른 폰을 피해 조향합니다. navmesh는 캐릭터를 전혀 모르므로, 2m 문을 지나는 경로를 그 문에
+	// 서 있는 동료가 없는 것처럼 짭니다. 회피가 없으면 동료에게 걸어 들어가 밀다가 경로 추종이
+	// "막힘"으로 포기합니다.
+	GetCharacterMovement()->bUseRVOAvoidance = true;
+	GetCharacterMovement()->AvoidanceConsiderationRadius = 250.0f;
+
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 }
 

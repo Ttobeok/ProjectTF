@@ -83,6 +83,20 @@ AProjectTFCharacter::AProjectTFCharacter()
 	// 캐릭터 무브먼트를 설정합니다
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 	GetCharacterMovement()->AirControl = 0.5f;
+
+	// Be something the squad steers round, without being steered. The AI pawns avoid other
+	// registered agents, and the player was not one: standing in a gap between cover and a wall
+	// was enough to wedge a squad member against the player's capsule until its move gave up.
+	// Ignoring every group means nothing ever nudges the player's own movement.
+	// 분대가 피해 가는 대상이 되되, 자신은 밀리지 않습니다. AI 폰은 등록된 다른 에이전트를
+	// 피하는데 플레이어는 등록돼 있지 않았습니다. 그래서 엄폐물과 벽 사이 틈에 서 있기만 해도
+	// 분대원이 플레이어 캡슐에 끼어 이동을 포기했습니다. 모든 그룹을 무시하게 해서 플레이어 자신의
+	// 움직임은 절대 밀리지 않게 합니다.
+	GetCharacterMovement()->bUseRVOAvoidance = true;
+
+	FNavAvoidanceMask IgnoreEveryone;
+	IgnoreEveryone.SetFlagsDirectly(0xFFFFFFFF);
+	GetCharacterMovement()->SetGroupsToIgnoreMask(IgnoreEveryone);
 }
 
 void AProjectTFCharacter::BeginPlay()
