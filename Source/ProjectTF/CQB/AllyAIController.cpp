@@ -11,6 +11,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "NavigationSystem.h"
+#include "Navigation/PathFollowingComponent.h"
 #include "DrawDebugHelpers.h"
 #include "ProjectTF.h"
 
@@ -38,6 +39,7 @@ void AAllyAIController::OnPossess(APawn* InPawn)
 
 	// even numbers go Red, odd go Blue, so a four member squad splits two and two
 	// 짝수는 Red, 홀수는 Blue. 네 명이면 둘씩 나뉘게 됩니다
+	SquadIndex = Taken;
 	Element = (Taken % 2 == 0) ? ESquadElement::Red : ESquadElement::Blue;
 
 	SetDisplayName(FString::Printf(TEXT("%s_%d"),
@@ -325,6 +327,12 @@ void AAllyAIController::EnterStack()
 	}
 }
 
+void AAllyAIController::IssueClearMove()
+{
+	bClearMoveIssued = true;
+	MoveToPoint(ClearPoint);
+}
+
 void AAllyAIController::UpdateStack(float DeltaTime)
 {
 	if (!HasReachedGoal() || bAnnouncedArrival)
@@ -356,13 +364,45 @@ void AAllyAIController::EnterClear()
 
 	RoomQuietTime = 0.0f;
 	bAnnouncedArrival = false;
+	bClearMoveIssued = false;
+	ClearRetries = 0;
 
-	if (OrderedDoorway)
+	if (!OrderedDoorway)
 	{
-		const FVector Point = OrderedDoorway->GetClearPoint();
-		MoveToPoint(Point);
-		OrderMarkerPoint = Point;
-		OrderMarkerTime = OrderMarkerDuration;
+		return;
+	}
+
+	// Each member takes its own slot, pulled onto the navmesh: a slot that lands inside cover or
+	// against a wall falls back to the room's centre point rather than failing the move.
+	// 각자 자기 슬롯으로 가되 navmesh 위로 끌어옵니다. 슬롯이 엄폐물 속이나 벽에 걸리면 이동을
+	// 실패시키는 대신 방 중앙 지점으로 대체합니다.
+	ClearPoint = OrderedDoorway->GetClearPoint(SquadIndex);
+
+	FNavLocation Projected;
+	const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (Nav && Nav->ProjectPointToNavigation(ClearPoint, Projected, FVector(60.0f, 60.0f, 200.0f)))
+	{
+		ClearPoint = Projected.Location;
+	}
+	else
+	{
+		ClearPoint = OrderedDoorway->GetClearPoint();
+	}
+
+	OrderMarkerPoint = ClearPoint;
+	OrderMarkerTime = OrderMarkerDuration;
+
+	// wait our turn rather than all hitting the doorway at once
+	// 한꺼번에 문으로 몰리지 않도록 자기 차례를 기다립니다
+	ClearStartDelay = ClearEntryInterval * static_cast<float>(SquadIndex);
+
+	if (ClearStartDelay <= 0.0f)
+	{
+		IssueClearMove();
+	}
+	else
+	{
+		StopMovement();
 	}
 }
 
@@ -370,11 +410,42 @@ void AAllyAIController::UpdateClear(float DeltaTime)
 {
 	// a hostile in the room is the whole reason for going in
 	// 방안의 적이무말로 들어가는 이유입니다
-	if (bHasLineOfSight && IsValid(CurrentTarget))
+	if (!bClearMoveIssued)
+	{
+		ClearStartDelay -= DeltaTime;
+		if (ClearStartDelay > 0.0f)
+		{
+			return;
+		}
+
+		IssueClearMove();
+	}
+
+	// Fight on the move. Clearing a room means going in, so a member who sees a suspect keeps
+	// walking to its slot and shoots while it does, rather than dropping into Engage.
+	//
+	// Engage looks for cover, and at the moment of contact the only cover is behind: the
+	// member turned round in the door frame to walk back out, into the squad mates coming in
+	// behind it, and the whole squad stopped in the doorway. The guide always said Clear does
+	// its own fighting; the code did not.
+	//
+	// 이동하면서 싸웁니다. 방을 소타한다는 건 들어간다는 뜻이므로, 용의자를 본 분대원은
+	// Engage로 떨어지지 않고 자기 슬롯으로 계속 걸어가며 사격합니다.
+	//
+	// Engage는 엄폐물을 찾는데, 접촉 순간 엄폐물은 뒤쪽에만 있습니다. 그래서 분대원이 문틀에서
+	// 몸을 돌려 도로 나가려다, 뒤따라 들어오던 동료들과 부딪혀 분대 전체가 문간에 멈췄습니다.
+	// 가이드는 처음부터 "Clear는 자기 자리에서 싸운다"고 했는데 코드는 그렇지 않았습니다.
+	const bool bContact = bHasLineOfSight && IsValid(CurrentTarget);
+
+	if (bContact)
 	{
 		RoomQuietTime = 0.0f;
-		SetState(ECQBAIState::Engage);
-		return;
+		SetFocus(CurrentTarget, EAIFocusPriority::Gameplay);
+		SetFiring(true);
+	}
+	else
+	{
+		SetFiring(false);
 	}
 
 	if (!HasReachedGoal())
@@ -382,7 +453,43 @@ void AAllyAIController::UpdateClear(float DeltaTime)
 		return;
 	}
 
+	// HasReachedGoal also returns true when path following gave up, which is what happens when a
+	// member is wedged against another pawn - the navmesh routes through characters as if they
+	// were not there. Treating that as arrival had members standing in the previous room calling
+	// "Room clear!" about a room they never entered. Check where the member actually is.
+	//
+	// HasReachedGoal은 경로 추종이 포기해도 true를 돌려주는데, 분대원이 다른 폰에 끼면 바로 그렇게
+	// 됩니다. navmesh는 캐릭터가 없는 것처럼 그 사이로 경로를 짜기 때문입니다. 이걸 도착으로 치니
+	// 분대원이 이전 방에 선 채로, 들어가 보지도 않은 방에 대해 "Room clear!"를 외쳤습니다. 실제
+	// 위치를 확인합니다.
+	const APawn* MyPawn = GetPawn();
+	const bool bInRoom = MyPawn
+		&& FVector::Dist2D(MyPawn->GetActorLocation(), ClearPoint) <= ClearArrivalTolerance;
+
+	if (!bInRoom)
+	{
+		if (ClearRetries < MaxClearRetries)
+		{
+			++ClearRetries;
+			IssueClearMove();
+			return;
+		}
+
+		// could not get in; go back to the player quietly rather than report a room it never saw
+		// 들어가지 못했습니다. 보지도 못한 방을 보고하는 대신 조용히 플레이어에게 돌아갑니다
+		SetFiring(false);
+		OrderFollow();
+		return;
+	}
+
 	StopMovement();
+
+	if (bContact)
+	{
+		// arrived with someone still in the room: hold the slot and keep shooting
+		// 방에 아직 누가 있는데 도착했습니다. 슬롯을 지키며 계속 쏩니다
+		return;
+	}
 
 	// nothing in here for a few seconds running, so call it
 	// 몇 초간 연속으로 아무것도 없으니 선언합니다
