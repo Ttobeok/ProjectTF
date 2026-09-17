@@ -28,6 +28,17 @@ FVector ADoorwayMarker::GetStackPoint(EStackSide Side) const
 		- GetActorForwardVector() * StackSetback;
 }
 
+FVector ADoorwayMarker::GetClearPoint(int32 Slot) const
+{
+	const int32 SafeSlot = FMath::Max(0, Slot);
+	const float Side = (SafeSlot % 2 == 0) ? -1.0f : 1.0f;
+	const float Depth = ClearDistance - ClearRankStep * static_cast<float>(SafeSlot / 2);
+
+	return GetActorLocation()
+		+ GetActorForwardVector() * FMath::Max(Depth, ClearRankStep)
+		+ GetActorRightVector() * (ClearSpread * Side);
+}
+
 FVector ADoorwayMarker::GetClearPoint() const
 {
 	return GetActorLocation() + GetActorForwardVector() * ClearDistance;

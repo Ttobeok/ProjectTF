@@ -45,6 +45,36 @@ public:
 	FVector GetClearPoint() const;
 
 	/**
+	 *  Where one squad member should go when clearing the room, by slot.
+	 *
+	 *  Sending four members to a single point had them converge through a 2 m doorway and shove
+	 *  each other at the goal, which reads as the squad getting stuck. Slots fan out across the
+	 *  room instead: the first two either side of the entry line at ClearDistance, the next two
+	 *  either side a step nearer the door.
+	 *
+	 *  방을 소타할 때 분대원 한 명이 갈 지점. 슬롯별입니다.
+	 *
+	 *  네 명을 한 점으로 보냈더니 2m 문을 몰려 지나 목표 지점에서 서로 밀쳐서, 분대가 끼인
+	 *  것처럼 보였습니다. 슬롯은 방 안으로 부채꼴로 퍼집니다. 앞의 둘은 진입선 좌우로
+	 *  ClearDistance 지점에, 다음 둘은 좌우로 문에 한 걸음 가까운 지점에 섭니다.
+	 */
+	FVector GetClearPoint(int32 Slot) const;
+
+	/**
+	 *  How far either side of the entry line the clear slots spread, in cm
+	 *  소타 슬롯이 진입선 좌우로 벌어지는 거리(cm)
+	 */
+	UPROPERTY(EditAnywhere, Category = "Doorway")
+	float ClearSpread = 130.0f;
+
+	/**
+	 *  How much nearer the door the second rank of clear slots sits, in cm
+	 *  두 번째 줄 소타 슬롯이 문에 얼마나 더 가까운지(cm)
+	 */
+	UPROPERTY(EditAnywhere, Category = "Doorway")
+	float ClearRankStep = 160.0f;
+
+	/**
 	 *  Name shown when the player aims at this doorway
 	 *  플레이어가 이 문을 조준했을 때 표시되는 이름
 	 */
