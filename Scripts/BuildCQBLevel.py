@@ -175,7 +175,16 @@ def build_cover():
         ("Cover_A1", -480.0, 120.0, 260.0, 100.0, 110.0),
         ("Cover_A2", -180.0, -180.0, 100.0, 260.0, 120.0),
         # room B: one per enemy
-        ("Cover_B1", 360.0, 140.0, 100.0, 260.0, 120.0),
+        #
+        # Cover_B1 guards the door, but it must not stand in the doorway lane. It used to sit at
+        # y 140 (spanning 10..270), right across the door's exit (150..350). The navmesh erodes
+        # every obstacle by the 35 cm agent radius, and the door's wall stubs end 40 cm into the
+        # room, so the stubs' eroded edge and the cover's eroded edge met at exactly x 275 with
+        # no gap between them. The door was open to the player and shut to the AI: every route
+        # between the rooms went round the flank loop, and allies ordered to clear room B walked
+        # left down the side corridor and wedged themselves in its far corner. At y 40 it spans
+        # -90..170, still between the door and Enemy_1, and leaves a lane about 110 cm wide.
+        ("Cover_B1", 360.0, 40.0, 100.0, 260.0, 120.0),
         ("Cover_B2", 880.0, 190.0, 100.0, 260.0, 120.0),
         ("Cover_B3", 620.0, -130.0, 260.0, 100.0, 110.0),
     ]
