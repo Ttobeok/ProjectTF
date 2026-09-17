@@ -26,6 +26,7 @@ class ADoorwayMarker;
  *    -CQBOrder=<name>         follow | hold | stack | clear | watch | challenge
  *    -CQBOrderDoor=<n>        which doorway, ordered west to east
  *    -CQBScreenshotAfter=<s>  take a screenshot after a delay
+ *    -CQBTraceSquad=<s>       log every squad member's position, state and path every <s> seconds
  *    -CQBPlayerAt=X,Y,Z       put the player there on the first tick, so a test can be run from
  *                             a spot the level does not start at without moving the PlayerStart
  *
@@ -82,6 +83,12 @@ protected:
 	void RunScreenshot();
 
 	/**
+	 *  Logs where each squad member is, what it is doing, and the path it is on
+	 *  각 분대원의 위치, 상태, 따라가는 경로를 로그로 남깁니다
+	 */
+	void RunTraceSquad();
+
+	/**
 	 *  Suspects, nearest the player first
 	 *  용의자들. 플레이어에게 가까운 순서
 	 */
@@ -97,6 +104,7 @@ protected:
 	FTimerHandle DamageTimer;
 	FTimerHandle OrderTimer;
 	FTimerHandle ScreenshotTimer;
+	FTimerHandle TraceSquadTimer;
 
 	int32 DamageCount = 1;
 	float DamageFraction = 10.0f;

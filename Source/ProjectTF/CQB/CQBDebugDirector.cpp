@@ -16,6 +16,8 @@
 #include "Misc/Parse.h"
 #include "UnrealClient.h"
 #include "ProjectTF.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "NavigationPath.h"
 
 ACQBDebugDirector::ACQBDebugDirector()
 {
@@ -89,6 +91,12 @@ void ACQBDebugDirector::ArmFromCommandLine()
 		FParse::Value(CommandLine, TEXT("CQBOrderDoor="), OrderDoorIndex);
 
 		Timers.SetTimer(OrderTimer, this, &ACQBDebugDirector::RunOrder, OrderAfter, false);
+	}
+
+	float TraceInterval = 0.0f;
+	if (FParse::Value(CommandLine, TEXT("CQBTraceSquad="), TraceInterval) && TraceInterval > 0.0f)
+	{
+		Timers.SetTimer(TraceSquadTimer, this, &ACQBDebugDirector::RunTraceSquad, TraceInterval, true);
 	}
 
 	float ScreenshotAfter = 0.0f;
@@ -215,6 +223,38 @@ void ACQBDebugDirector::RunOrder()
 	}
 
 	Player->IssueSquadOrder(OrderName, Doorway);
+}
+
+void ACQBDebugDirector::RunTraceSquad()
+{
+
+	for (TActorIterator<AAllyAIController> It(GetWorld()); It; ++It)
+	{
+		const AAllyAIController* Member = *It;
+		const APawn* Body = Member ? Member->GetPawn() : nullptr;
+		if (!Body)
+		{
+			continue;
+		}
+
+		FString PathText = TEXT("no path");
+		if (const UPathFollowingComponent* Follow = Member->GetPathFollowingComponent())
+		{
+			if (const FNavPathSharedPtr Path = Follow->GetPath(); Path.IsValid() && Path->GetPathPoints().Num() > 0)
+			{
+				const TArray<FNavPathPoint>& Points = Path->GetPathPoints();
+				PathText = FString::Printf(TEXT("%d pts, len %.0f, next %s, goal %s"),
+					Points.Num(), Path->GetLength(),
+					*Points[FMath::Min(1, Points.Num() - 1)].Location.ToCompactString(),
+					*Points.Last().Location.ToCompactString());
+			}
+		}
+
+		UE_LOG(LogProjectTF, Warning, TEXT("CQB trace: %s  %-8s at %s  status %d  %s"),
+			*Member->GetDisplayName(), *FCQBNames::StateToString(Member->GetState()),
+			*Body->GetActorLocation().ToCompactString(),
+			static_cast<int32>(Member->GetMoveStatus()), *PathText);
+	}
 }
 
 void ACQBDebugDirector::RunScreenshot()
